@@ -32,7 +32,6 @@ const navigation = [
 
 export function Header() {
   const pathname = usePathname();
-
   const {
     address,
     isConnected,

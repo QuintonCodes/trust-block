@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 
@@ -23,11 +23,6 @@ export const metadata: Metadata = {
     "payments",
     "blockchain",
   ],
-};
-
-export const viewport: Viewport = {
-  themeColor: "#111827",
-  colorScheme: "dark",
 };
 
 export default function RootLayout({
