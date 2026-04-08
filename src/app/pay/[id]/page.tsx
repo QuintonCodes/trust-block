@@ -35,6 +35,31 @@ import {
 
 type PaymentStep = "connect" | "approve" | "deposit" | "complete";
 
+interface Web3Error {
+  shortMessage?: string;
+  message?: string;
+}
+
+function getCleanErrorMessage(error: Web3Error | null | undefined): string {
+  if (!error) return "";
+
+  // Viem sometimes provides a shortMessage which is cleaner
+  const msgText = (error.shortMessage || error.message || "").toLowerCase();
+
+  if (msgText.includes("user rejected") || msgText.includes("user denied")) {
+    return "Transaction was cancelled.";
+  }
+  if (msgText.includes("insufficient funds")) {
+    return "You do not have enough funds to cover this transaction and gas fees.";
+  }
+  if (msgText.includes("unrecognized-selector")) {
+    return "Contract error: Function not found. Check if the correct contract is deployed.";
+  }
+
+  // Fallback to viem's short message, or a generic error if neither exists
+  return error.shortMessage || "Transaction failed. Please try again.";
+}
+
 export default function PaymentPage({
   params,
 }: {
@@ -623,8 +648,7 @@ export default function PaymentPage({
               {(approvalError || depositError) && (
                 <div className="mt-4 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
                   <p className="text-sm text-destructive">
-                    {(approvalError || depositError)?.message ||
-                      "Transaction failed. Please try again."}
+                    {getCleanErrorMessage(approvalError || depositError)}
                   </p>
                 </div>
               )}

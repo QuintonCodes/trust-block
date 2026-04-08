@@ -1,64 +1,65 @@
-import { Clock, FileText, Shield, TrendingUp } from "lucide-react";
+import { CheckCircle, FileText, TrendingUp, Wallet } from "lucide-react";
 
 import { DashboardMetrics } from "@/lib/types";
-import { formatCompactNumber } from "@/lib/web3/utils";
 
-const metricConfig = [
-  {
-    key: "totalSecured" as const,
-    label: "Total USDC Secured",
-    icon: Shield,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-  },
-  {
-    key: "lifetimeEarnings" as const,
-    label: "Lifetime Earnings",
-    icon: TrendingUp,
-    color: "text-accent",
-    bgColor: "bg-accent/10",
-  },
-  {
-    key: "activeEscrows" as const,
-    label: "Active Escrows",
+type MetricsCardsProps = {
+  metrics: DashboardMetrics[];
+};
+
+// Map titles to specific icons and colors for dynamic rendering
+const metricStyles: Record<
+  string,
+  { icon: React.ElementType; color: string; bgColor: string }
+> = {
+  "Active Escrows": {
     icon: FileText,
     color: "text-tb-warning",
     bgColor: "bg-tb-warning/10",
-    isCount: true,
   },
-  {
-    key: "pendingDeposits" as const,
-    label: "Pending Deposits",
-    icon: Clock,
-    color: "text-secondary-foreground",
-    bgColor: "bg-secondary-foreground/10",
-    isCount: true,
+  "Total Volume": {
+    icon: TrendingUp,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
-];
+  "Completed Projects": {
+    icon: CheckCircle,
+    color: "text-accent",
+    bgColor: "bg-accent/10",
+  },
+};
 
-export function MetricsCards({ metrics }: { metrics: DashboardMetrics }) {
+const defaultStyle = {
+  icon: Wallet,
+  color: "text-secondary-foreground",
+  bgColor: "bg-secondary-foreground/10",
+};
+
+export function MetricsCards({ metrics }: MetricsCardsProps) {
+  if (!metrics || metrics.length === 0) return null;
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {metricConfig.map((config) => {
-        const Icon = config.icon;
-        const value = metrics[config.key];
+    <div className="grid gap-4 md:grid-cols-3">
+      {metrics.map((metric) => {
+        const style = metricStyles[metric.title] || defaultStyle;
+        const Icon = style.icon;
 
         return (
           <div
-            key={config.key}
+            key={metric.title}
             className="rounded-xl border border-border bg-secondary p-6"
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-secondary-foreground">
-                {config.label}
+                {metric.title}
               </p>
-              <div className={`rounded-lg p-2 ${config.bgColor}`}>
-                <Icon className={`size-5 ${config.color}`} />
+              <div className={`rounded-lg p-2 ${style.bgColor}`}>
+                <Icon className={`size-5 ${style.color}`} />
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-semibold text-white">
-                {config.isCount ? value : formatCompactNumber(value)}
+              <p className="text-2xl font-bold text-white">{metric.value}</p>
+              <p className="mt-1 text-xs text-secondary-foreground">
+                {metric.description}
               </p>
             </div>
           </div>

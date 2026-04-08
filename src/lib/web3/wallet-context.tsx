@@ -1,17 +1,24 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createContext, useContext, type ReactNode } from "react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+} from "@tanstack/react-query";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { toast } from "sonner";
 import {
   useChainId,
   useConnect,
   useConnection,
+  useConnectionEffect,
   useConnectors,
   useDisconnect,
   useSwitchChain,
   WagmiProvider,
 } from "wagmi";
 
+import { syncUserLogin } from "@/actions/user";
 import { CHAIN_CONFIG, config, PRIMARY_CHAIN_ID } from "./config";
 
 // ============ Wallet Hook ============
@@ -60,24 +67,104 @@ function WalletContextInner({ children }: { children: ReactNode }) {
   const { address, isConnected, isConnecting } = useConnection();
   const chainId = useChainId();
   const connectors = useConnectors();
-  const { mutate: connect, error: connectError } = useConnect();
-  const { mutate: disconnect } = useDisconnect();
-  const { mutate: switchChain, error: switchError } = useSwitchChain();
+
+  const { mutate: connectMutation, error: connectError } = useConnect();
+  const { mutate: disconnectMutation } = useDisconnect();
+  const { mutate: switchChainMutation, error: switchError } = useSwitchChain();
+
+  const { mutate: syncLogin } = useMutation({
+    mutationFn: async (walletAddress: string) => {
+      // Calling your Server Action directly!
+      const response = await syncUserLogin(walletAddress);
+      if (!response.success) throw new Error(response.error);
+      return response.user;
+    },
+    onSuccess: () => {
+      console.log("User synced with database successfully");
+    },
+    onError: (error) => {
+      console.error("Failed to sync user to DB:", error);
+      // You could also add a toast.error here if you want
+    },
+  });
 
   const isCorrectNetwork = chainId === PRIMARY_CHAIN_ID;
   const currentChainConfig = chainId
     ? CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG]
     : undefined;
 
-  function handleConnect() {
-    const metaMaskConnector = connectors.find((c) => c.id === "metaMask");
-    if (metaMaskConnector) {
-      connect({ connector: metaMaskConnector });
+  // 1. Sync User to Database
+  useEffect(() => {
+    if (isConnected && address) {
+      syncLogin(address);
     }
+  }, [isConnected, address, syncLogin]);
+
+  // 2. Listen for external wallet disconnects (e.g., user locks MetaMask or it crashes)
+  useConnectionEffect({
+    onDisconnect() {
+      console.log("Wallet disconnected externally");
+      toast.error("Wallet disconnected. Please check MetaMask.");
+      // Ensure the internal wagmi state is wiped clean
+      disconnectMutation();
+    },
+  });
+
+  function handleConnect() {
+    const metaMaskConnector = connectors.find(
+      (c) => c.id === "metaMask" || c.id === "injected",
+    );
+
+    if (!metaMaskConnector) {
+      toast.error("MetaMask not found. Please install the extension.");
+      return;
+    }
+
+    connectMutation(
+      { connector: metaMaskConnector },
+      {
+        onSuccess: () => {
+          toast.success("Wallet connected successfully");
+        },
+        onError: (err) => {
+          console.error("Wallet connection error:", err);
+
+          // If MetaMask is in a weird ghost state, force a disconnect to clear cache
+          disconnectMutation();
+
+          if (
+            err.message.includes("Failed to connect") ||
+            err.message.includes("User rejected")
+          ) {
+            toast.error(
+              "Connection failed. Please unlock or restart MetaMask.",
+            );
+          } else {
+            toast.error("Could not connect to wallet. Please try again.");
+          }
+        },
+      },
+    );
   }
 
   function handleSwitchNetwork() {
-    switchChain({ chainId: PRIMARY_CHAIN_ID });
+    switchChainMutation(
+      { chainId: PRIMARY_CHAIN_ID },
+      {
+        onError: (err) => {
+          console.error("Network switch error:", err);
+          toast.error("Failed to switch network in MetaMask.");
+        },
+      },
+    );
+  }
+
+  function handleDisconnect() {
+    disconnectMutation(undefined, {
+      onSuccess: () => {
+        toast.success("Wallet disconnected");
+      },
+    });
   }
 
   return (
@@ -91,7 +178,7 @@ function WalletContextInner({ children }: { children: ReactNode }) {
         networkName: currentChainConfig?.name || `Unknown Network`,
         networkColor: currentChainConfig?.color || "#94a3b8",
         connect: handleConnect,
-        disconnect,
+        disconnect: handleDisconnect,
         switchToCorrectNetwork: handleSwitchNetwork,
         error: connectError || switchError || null,
       }}

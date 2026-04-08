@@ -1,14 +1,23 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Plus, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { z } from "zod";
 
 import { EscrowCard } from "@/components/dashboard/escrow-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { mockEscrows } from "@/lib/mock-data";
+import { useEscrowsList } from "@/lib/api/hooks/use-escrows-list";
 import type { EscrowStatus } from "@/lib/types";
+import { useWallet } from "@/lib/web3/wallet-context";
+
+// 1. Zod Schema for search validation
+const searchSchema = z.object({
+  searchQuery: z.string().optional(),
+});
 
 const statusFilters: { label: string; value: EscrowStatus | "ALL" }[] = [
   { label: "All", value: "ALL" },
@@ -20,17 +29,42 @@ const statusFilters: { label: string; value: EscrowStatus | "ALL" }[] = [
 ];
 
 export default function EscrowsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { address, isConnected } = useWallet();
   const [statusFilter, setStatusFilter] = useState<EscrowStatus | "ALL">("ALL");
 
-  const filteredEscrows = mockEscrows.filter((escrow) => {
-    const matchesSearch =
-      escrow.projectTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      escrow.scopeOfWork.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "ALL" || escrow.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  // 2. Initialize React Hook Form
+  const form = useForm<z.infer<typeof searchSchema>>({
+    resolver: zodResolver(searchSchema),
+    defaultValues: {
+      searchQuery: "",
+    },
   });
+
+  const searchValue =
+    useWatch({
+      control: form.control,
+      name: "searchQuery",
+    }) || "";
+
+  // 3. Fetch Data via Tanstack Query
+  const { data, isLoading, isError } = useEscrowsList(
+    address,
+    searchValue,
+    statusFilter,
+  );
+
+  // --- States ---
+  if (!isConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
+        <Wallet className="size-12 text-secondary-foreground" />
+        <h2 className="text-xl font-medium text-white">Connect Your Wallet</h2>
+        <p className="text-secondary-foreground max-w-sm">
+          Please connect your wallet to view and manage your active escrows.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -52,15 +86,20 @@ export default function EscrowsPage() {
 
       {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary-foreground" />
-          <Input
-            placeholder="Search escrows..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 border-border bg-secondary text-white placeholder:text-secondary-foreground"
-          />
-        </div>
+        <form
+          onSubmit={form.handleSubmit(() => {})}
+          className="relative w-full md:w-96"
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-secondary-foreground" />
+            <Input
+              placeholder="Search by title or scope..."
+              className="pl-10 border-border bg-secondary text-white placeholder:text-secondary-foreground focus-visible:ring-primary"
+              {...form.register("searchQuery")}
+            />
+          </div>
+        </form>
+
         <div className="flex flex-wrap gap-2">
           {statusFilters.map((filter) => (
             <Button
@@ -81,15 +120,41 @@ export default function EscrowsPage() {
       </div>
 
       {/* Escrows Grid */}
-      {filteredEscrows.length === 0 ? (
-        <div className="rounded-xl border border-border border-dashed bg-secondary/50 p-12 text-center">
-          <p className="text-secondary-foreground">
-            No escrows found matching your criteria
+      {isLoading ? (
+        <div className="flex min-h-100 flex-col items-center justify-center space-y-4 rounded-xl border border-border border-dashed bg-secondary/20">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-sm text-secondary-foreground">
+            Loading escrows...
           </p>
+        </div>
+      ) : isError ? (
+        <div className="flex min-h-100 flex-col items-center justify-center space-y-4 rounded-xl border border-destructive/50 border-dashed bg-destructive/10">
+          <p className="text-sm text-destructive">
+            Failed to load escrows. Please try again.
+          </p>
+        </div>
+      ) : !data?.escrows || data.escrows.length === 0 ? (
+        <div className="flex min-h-100 flex-col items-center justify-center space-y-4 rounded-xl border border-border border-dashed bg-secondary/20 p-12 text-center">
+          <p className="text-secondary-foreground">
+            {searchValue || statusFilter !== "ALL"
+              ? "No escrows found matching your search criteria."
+              : "You don't have any escrows yet. Create your first one!"}
+          </p>
+          {searchValue || statusFilter !== "ALL" ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                form.reset();
+                setStatusFilter("ALL");
+              }}
+            >
+              Clear Filters
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredEscrows.map((escrow) => (
+          {data.escrows.map((escrow) => (
             <EscrowCard key={escrow.id} escrow={escrow} />
           ))}
         </div>

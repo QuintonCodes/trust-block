@@ -91,10 +91,9 @@ export interface CreateMilestoneInput {
 
 // Dashboard metrics
 export interface DashboardMetrics {
-  totalSecured: number;
-  lifetimeEarnings: number;
-  activeEscrows: number;
-  pendingDeposits: number;
+  title: string;
+  value: string;
+  description: string;
 }
 
 // Status badge variants
