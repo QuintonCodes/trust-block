@@ -3,9 +3,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
 import {
-  useAccount,
   useChainId,
   useConnect,
+  useConnection,
+  useConnectors,
   useDisconnect,
   useSwitchChain,
   WagmiProvider,
@@ -56,30 +57,22 @@ const queryClient = new QueryClient({
 const WalletContext = createContext<WalletContextType | null>(null);
 
 function WalletContextInner({ children }: { children: ReactNode }) {
-  const { address, isConnected, isConnecting } = useAccount();
+  const { address, isConnected, isConnecting } = useConnection();
   const chainId = useChainId();
-  const {
-    connect,
-    connectors,
-    error: connectError,
-    isPending: isConnectPending,
-  } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { switchChain, error: switchError } = useSwitchChain();
+  const connectors = useConnectors();
+  const { mutate: connect, error: connectError } = useConnect();
+  const { mutate: disconnect } = useDisconnect();
+  const { mutate: switchChain, error: switchError } = useSwitchChain();
 
   const isCorrectNetwork = chainId === PRIMARY_CHAIN_ID;
-  const chainConfig = CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG];
-  const networkName = chainConfig?.name || `Chain ${chainId}`;
-  const networkColor = chainConfig?.color || "#FFFFFF";
+  const currentChainConfig = chainId
+    ? CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG]
+    : undefined;
 
   function handleConnect() {
-    const injectedConnector = connectors.find(
-      (c) => c.id === "injected" || c.name.toLowerCase().includes("metamask"),
-    );
-    if (injectedConnector) {
-      connect({ connector: injectedConnector });
-    } else if (connectors.length > 0) {
-      connect({ connector: connectors[0] });
+    const metaMaskConnector = connectors.find((c) => c.id === "metaMask");
+    if (metaMaskConnector) {
+      connect({ connector: metaMaskConnector });
     }
   }
 
@@ -92,11 +85,11 @@ function WalletContextInner({ children }: { children: ReactNode }) {
       value={{
         address,
         isConnected,
-        isConnecting: isConnecting || isConnectPending,
+        isConnecting,
         chainId,
         isCorrectNetwork,
-        networkName,
-        networkColor,
+        networkName: currentChainConfig?.name || `Unknown Network`,
+        networkColor: currentChainConfig?.color || "#94a3b8",
         connect: handleConnect,
         disconnect,
         switchToCorrectNetwork: handleSwitchNetwork,

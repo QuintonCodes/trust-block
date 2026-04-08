@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -41,3 +39,15 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Hardhat compiled contracts and cache
+/artifacts/
+/cache/
+/typechain/
+/typechain-types/
+
+# Hardhat Ignition local deployments (keeps testnet/mainnet deployments if you want to track them, but ignores local)
+/ignition/deployments/chain-31337/
+
+# Hardhat coverage reports
+coverage.json
