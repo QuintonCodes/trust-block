@@ -1,12 +1,19 @@
 "use client";
 
-import { ChevronRight, Copy, ExternalLink } from "lucide-react";
+import {
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useDeleteEscrowDb } from "@/lib/api/hooks/use-escrows-mutations";
 import { EscrowLink } from "@/lib/types";
 import {
   copyToClipboard,
@@ -17,6 +24,9 @@ import {
 } from "@/lib/web3/utils";
 
 export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
+  const { mutateAsync: deleteEscrow, isPending: isDeleting } =
+    useDeleteEscrowDb();
+
   const completedMilestones =
     escrow.milestones?.filter((m) => m.status === "APPROVED_AND_PAID").length ||
     0;
@@ -33,6 +43,15 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
     }
   }
 
+  async function handleDelete() {
+    try {
+      await deleteEscrow(escrow.id);
+      toast.success("Draft escrow deleted successfully");
+    } catch {
+      toast.error("Failed to delete draft escrow");
+    }
+  }
+
   return (
     <div className="group rounded-xl border border-border bg-secondary p-5 transition-colors hover:border-primary/50">
       <div className="flex items-start justify-between">
@@ -42,13 +61,15 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
             <StatusBadge status={escrow.status} />
           </div>
 
-          {escrow.clientAddress && (
+          {escrow.clientAddress ? (
             <p className="mt-1 text-sm text-secondary-foreground">
               Client:{" "}
               <span className="text-white">
                 {truncateAddress(escrow.clientAddress)}
               </span>
             </p>
+          ) : (
+            <span className="text-tb-warning">Awaiting deposit</span>
           )}
         </div>
 
@@ -80,6 +101,23 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
         </p>
 
         <div className="flex items-center gap-2">
+          {escrow.status === "DRAFT" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isDeleting}
+              onClick={handleDelete}
+              className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              {isDeleting ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1.5 size-3.5" />
+              )}
+              Delete
+            </Button>
+          )}
+
           {escrow.status === "AWAITING_FUNDS" && (
             <Button
               variant="ghost"

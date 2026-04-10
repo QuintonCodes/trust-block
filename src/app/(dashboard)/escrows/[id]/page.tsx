@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { mockEscrows, mockTransactions, mockUser } from "@/lib/mock-data";
+import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
 import { PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
   useApproveMilestone,
@@ -43,6 +43,14 @@ export default function EscrowDetailPage({
 }) {
   const { id } = use(params);
   const { address } = useWallet();
+
+  // Fetch Escrow Data
+  const {
+    data: escrow,
+    isLoading: isEscrowLoading,
+    error: escrowFetchError,
+    refetch: refetchEscrow,
+  } = useGetEscrow(id);
 
   // Wagmi hooks
   const {
@@ -120,18 +128,33 @@ export default function EscrowDetailPage({
   useEffect(() => {
     if (isApproveConfirmed || isSubmitConfirmed || isAutoReleaseConfirmed) {
       toast.success("Transaction confirmed!");
-      setTimeout(() => setSelectedMilestone(null), 0);
+      refetchEscrow();
+      setTimeout(() => setSelectedMilestone(null), 1000);
     }
-  }, [isApproveConfirmed, isSubmitConfirmed, isAutoReleaseConfirmed]);
+  }, [
+    isApproveConfirmed,
+    isSubmitConfirmed,
+    isAutoReleaseConfirmed,
+    refetchEscrow,
+  ]);
 
-  const escrow = mockEscrows.find((e) => e.id === id);
+  if (isEscrowLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Loader2 className="size-8 animate-spin text-accent" />
+        <p className="mt-4 text-secondary-foreground">
+          Loading escrow details...
+        </p>
+      </div>
+    );
+  }
 
-  if (!escrow) {
+  if (escrowFetchError || !escrow) {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-semibold text-white">Escrow Not Found</h1>
         <p className="mt-2 text-secondary-foreground">
-          The escrow you are looking for does not exist.
+          The escrow you are looking for does not exist or failed to load.
         </p>
         <Link href="/escrows">
           <Button className="mt-4 bg-ring hover:bg-ring/80 text-white">
@@ -142,14 +165,12 @@ export default function EscrowDetailPage({
     );
   }
 
-  const transactions = mockTransactions.filter((t) => t.escrowLinkId === id);
+  const transactions = escrow.transactions || [];
   const activeHash = approveHash || submitHash || autoReleaseHash;
 
   // Determine user role for this escrow
   const isWorker =
-    address?.toLowerCase() === escrow.freelancerAddress.toLowerCase() ||
-    mockUser.walletAddress.toLowerCase() ===
-      escrow.freelancerAddress?.toLowerCase();
+    address?.toLowerCase() === escrow.freelancerAddress.toLowerCase();
   const isClient =
     address?.toLowerCase() === escrow.clientAddress?.toLowerCase();
 
@@ -313,18 +334,19 @@ export default function EscrowDetailPage({
                   const autoRelease = milestone.autoReleaseAt
                     ? getAutoReleaseTime(milestone.autoReleaseAt)
                     : null;
+
                   const isPaid =
                     milestone.status === "APPROVED_AND_PAID" ||
                     milestone.status === "AUTO_RELEASED";
-                  const canApprove =
-                    isClient &&
-                    (milestone.status === "WORK_SUBMITTED" ||
-                      milestone.status === "PENDING_APPROVAL");
+                  const isInReview =
+                    milestone.status === "WORK_SUBMITTED" ||
+                    milestone.status === "PENDING_APPROVAL";
+
+                  // Rules for buttons based on roles and statuses
+                  const canApprove = isClient && isInReview;
                   const canSubmit = isWorker && milestone.status === "FUNDED";
-                  const canAutoRelease =
-                    autoRelease?.expired &&
-                    (milestone.status === "WORK_SUBMITTED" ||
-                      milestone.status === "PENDING_APPROVAL");
+                  const canAutoRelease = autoRelease?.expired && isInReview;
+
                   const isLoading =
                     selectedMilestone === index &&
                     actionStatus !== "idle" &&
@@ -337,8 +359,7 @@ export default function EscrowDetailPage({
                       className={`rounded-lg border p-4 ${
                         isPaid
                           ? "border-accent/30 bg-accent/5"
-                          : milestone.status === "PENDING_APPROVAL" ||
-                              milestone.status === "WORK_SUBMITTED"
+                          : isInReview
                             ? "border-tb-warning/30 bg-tb-warning/5"
                             : "border-border bg-background"
                       }`}
@@ -398,7 +419,7 @@ export default function EscrowDetailPage({
                                   onClick={() => handleApproveMilestone(index)}
                                   disabled={isLoading}
                                   size="sm"
-                                  className="bg-accent hover:bg-accent text-white"
+                                  className="bg-accent/80 hover:bg-accent text-white"
                                 >
                                   {isLoading ? (
                                     <>

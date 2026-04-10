@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
 import { CreateEscrowInput, EscrowStatus } from "@/lib/types";
@@ -24,6 +24,22 @@ export function useUpdateEscrowDb() {
       const { id, ...payload } = data;
       const response = await axios.patch(`/api/escrows/${id}`, payload);
       return response.data;
+    },
+  });
+}
+
+export function useDeleteEscrowDb() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await axios.delete(`/api/escrows/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      // Refresh the dashboard list so the deleted item vanishes
+      queryClient.invalidateQueries({ queryKey: ["escrows"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

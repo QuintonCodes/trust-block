@@ -65,17 +65,6 @@ export default function DashboardPage() {
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Active Escrows - Takes 2 columns */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-white">Active Escrows</h3>
-            {hasActiveEscrows && (
-              <Link href="/escrows/new">
-                <Button size="sm" variant="outline">
-                  <PlusCircle className="mr-2 size-4" /> New Escrow
-                </Button>
-              </Link>
-            )}
-          </div>
-
           {hasActiveEscrows ? (
             <EscrowsList
               escrows={activeEscrows.slice(0, 4)}

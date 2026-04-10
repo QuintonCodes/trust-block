@@ -159,7 +159,13 @@ export default function NewEscrowPage() {
     reset: resetDeposit,
   } = useDepositFunds();
 
-  const form = useForm<FormSchema>({
+  const {
+    control,
+    reset: resetForm,
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
     defaultValues: {
@@ -177,31 +183,31 @@ export default function NewEscrowPage() {
     append: addMilestone,
     remove: removeMilestone,
   } = useFieldArray({
-    control: form.control,
+    control: control,
     name: "milestones",
   });
 
   const useMilestones =
     useWatch({
-      control: form.control,
+      control: control,
       name: "useMilestones",
     }) || false;
 
   const fundImmediately =
     useWatch({
-      control: form.control,
+      control: control,
       name: "fundImmediately",
     }) || false;
 
   const watchedMilestones =
     useWatch({
-      control: form.control,
+      control: control,
       name: "milestones",
     }) || [];
 
   const formTotalAmount =
     useWatch({
-      control: form.control,
+      control: control,
       name: "totalAmount",
     }) || 0;
 
@@ -373,7 +379,7 @@ export default function NewEscrowPage() {
   };
 
   function handleCreateAnother() {
-    form.reset({
+    resetForm({
       projectTitle: "",
       scopeOfWork: "",
       useMilestones: false,
@@ -551,10 +557,7 @@ export default function NewEscrowPage() {
         </div>
       )}
 
-      <form
-        onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
-        className="space-y-8"
-      >
+      <form onSubmit={(e) => handleSubmit(onSubmit)(e)} className="space-y-8">
         {/* Project Details */}
         <div className="rounded-xl border border-border bg-secondary p-6">
           <h2 className="text-lg font-medium text-white mb-4">
@@ -572,13 +575,13 @@ export default function NewEscrowPage() {
               <Input
                 id="projectTitle"
                 placeholder="e.g., E-commerce Platform Development"
-                {...form.register("projectTitle")}
+                {...register("projectTitle")}
                 className="mt-1.5 border-border bg-background text-white placeholder:text-secondary-foreground/50"
                 disabled={!isConnected || isSubmitting}
               />
-              {form.formState.errors.projectTitle && (
+              {errors.projectTitle && (
                 <p className="mt-1 text-sm text-destructive">
-                  {form.formState.errors.projectTitle.message}
+                  {errors.projectTitle.message}
                 </p>
               )}
             </div>
@@ -593,13 +596,13 @@ export default function NewEscrowPage() {
               <Textarea
                 id="scopeOfWork"
                 placeholder="Describe the deliverables and expectations..."
-                {...form.register("scopeOfWork")}
+                {...register("scopeOfWork")}
                 className="mt-1.5 min-h-30 border-border bg-background text-white placeholder:text-secondary-foreground/50"
                 disabled={!isConnected || isSubmitting}
               />
-              {form.formState.errors.scopeOfWork && (
+              {errors.scopeOfWork && (
                 <p className="mt-1 text-sm text-destructive">
-                  {form.formState.errors.scopeOfWork.message}
+                  {errors.scopeOfWork.message}
                 </p>
               )}
             </div>
@@ -620,7 +623,7 @@ export default function NewEscrowPage() {
                 Use Milestones
               </Label>
               <Controller
-                control={form.control}
+                control={control}
                 name="useMilestones"
                 render={({ field }) => (
                   <Switch
@@ -661,16 +664,13 @@ export default function NewEscrowPage() {
                     <div>
                       <Input
                         placeholder="Milestone title"
-                        {...form.register(`milestones.${index}.title` as const)}
+                        {...register(`milestones.${index}.title` as const)}
                         className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
                         disabled={!isConnected || isSubmitting}
                       />
-                      {form.formState.errors.milestones?.[index]?.title && (
+                      {errors.milestones?.[index]?.title && (
                         <p className="text-xs text-destructive mt-1">
-                          {
-                            form.formState.errors.milestones[index]?.title
-                              ?.message
-                          }
+                          {errors.milestones[index]?.title?.message}
                         </p>
                       )}
                     </div>
@@ -678,12 +678,9 @@ export default function NewEscrowPage() {
                       <Input
                         type="number"
                         placeholder="Amount (USDC)"
-                        {...form.register(
-                          `milestones.${index}.amount` as const,
-                          {
-                            valueAsNumber: true,
-                          },
-                        )}
+                        {...register(`milestones.${index}.amount` as const, {
+                          valueAsNumber: true,
+                        })}
                         className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
                         step="0.01"
                         disabled={!isConnected || isSubmitting}
@@ -693,9 +690,7 @@ export default function NewEscrowPage() {
                   <div className="mt-3">
                     <Input
                       placeholder="Description (optional)"
-                      {...form.register(
-                        `milestones.${index}.description` as const,
-                      )}
+                      {...register(`milestones.${index}.description` as const)}
                       className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
                       disabled={!isConnected || isSubmitting}
                     />
@@ -728,13 +723,13 @@ export default function NewEscrowPage() {
                 type="number"
                 placeholder="0.00"
                 step="0.01"
-                {...form.register("totalAmount", { valueAsNumber: true })}
+                {...register("totalAmount", { valueAsNumber: true })}
                 className="mt-1.5 border-border bg-background text-white placeholder:text-secondary-foreground/50"
                 disabled={!isConnected || isSubmitting}
               />
-              {form.formState.errors.totalAmount && (
+              {errors.totalAmount && (
                 <p className="mt-1 text-sm text-destructive">
-                  {form.formState.errors.totalAmount.message}
+                  {errors.totalAmount.message}
                 </p>
               )}
             </div>
@@ -750,7 +745,7 @@ export default function NewEscrowPage() {
               </p>
             </div>
             <Controller
-              control={form.control}
+              control={control}
               name="fundImmediately"
               render={({ field }) => (
                 <Switch

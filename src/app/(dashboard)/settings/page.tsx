@@ -1,29 +1,49 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Bell,
   Briefcase,
   Check,
   Copy,
   ExternalLink,
+  Loader2,
   Shield,
   User,
   Users,
   Wallet,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Controller, SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { mockUser } from "@/lib/mock-data";
-import type { UserRole } from "@/lib/types";
+import { useGetUser, useUpdateUser } from "@/lib/api/hooks/use-user";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import { truncateAddress } from "@/lib/web3/utils";
 import { useWallet } from "@/lib/web3/wallet-context";
+
+const settingsSchema = z.object({
+  role: z.enum(["WORKER", "CLIENT"]),
+  displayName: z
+    .string()
+    .max(50, "Display name must be less than 50 characters")
+    .optional(),
+  bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
+  notifications: z.object({
+    emailDeposits: z.boolean(),
+    emailPayouts: z.boolean(),
+    emailMilestones: z.boolean(),
+    browserNotifications: z.boolean(),
+  }),
+});
+
+type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 export default function SettingsPage() {
   const {
@@ -34,25 +54,59 @@ export default function SettingsPage() {
     switchToCorrectNetwork,
     networkName,
   } = useWallet();
+
   const [copied, setCopied] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  const [profile, setProfile] = useState({
-    displayName: mockUser.displayName || "",
-    bio: mockUser.bio || "",
+  const { data: user, isLoading: isUserLoading } = useGetUser(address);
+  const { mutateAsync: updateUser, isPending: isUpdating } = useUpdateUser();
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsSchema),
+    mode: "onChange",
+    defaultValues: {
+      role: "WORKER",
+      displayName: "",
+      bio: "",
+      notifications: {
+        emailDeposits: true,
+        emailPayouts: true,
+        emailMilestones: true,
+        browserNotifications: false,
+      },
+    },
   });
 
-  const [userRole, setUserRole] = useState<UserRole>(mockUser.role);
-
-  const [notifications, setNotifications] = useState({
-    emailDeposits: true,
-    emailPayouts: true,
-    emailMilestones: true,
-    browserNotifications: false,
-  });
+  const currentRole =
+    useWatch({
+      control: control,
+      name: "role",
+    }) || "WORKER";
 
   const chainConfig =
     CHAIN_CONFIG[PRIMARY_CHAIN_ID as keyof typeof CHAIN_CONFIG];
+
+  useEffect(() => {
+    if (user) {
+      reset({
+        role: user.role || "WORKER",
+        displayName: user.displayName || "",
+        bio: user.bio || "",
+        notifications: {
+          emailDeposits: true,
+          emailPayouts: true,
+          emailMilestones: true,
+          browserNotifications: false,
+        },
+      });
+    }
+  }, [user, reset]);
 
   async function handleCopyAddress() {
     if (address) {
@@ -63,28 +117,87 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSaveProfile() {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast.success("Profile updated successfully");
+  const onSubmit: SubmitHandler<SettingsFormValues> = async (data) => {
+    if (!address) return;
+    try {
+      await updateUser({
+        address,
+        data: {
+          role: data.role,
+          displayName: data.displayName,
+          bio: data.bio,
+        },
+      });
+      toast.success("Settings saved successfully");
+    } catch {
+      toast.error("Failed to update settings. Please try again.");
+    }
+  };
+
+  if (!isConnected || !address) {
+    return (
+      <div className="max-w-3xl mx-auto mt-12">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-secondary p-12 text-center space-y-5">
+          <div className="rounded-full bg-primary/10 p-4">
+            <Shield className="size-10 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-semibold text-white">
+              Authentication Required
+            </h2>
+            <p className="mt-2 text-secondary-foreground max-w-md">
+              Please connect your Web3 wallet to access and manage your profile,
+              roles, and platform settings.
+            </p>
+          </div>
+          <Button
+            onClick={connect}
+            className="bg-primary hover:bg-primary/90 text-white mt-2"
+          >
+            <Wallet className="mr-2 size-4" />
+            Connect Wallet
+          </Button>
+        </div>
+      </div>
+    );
   }
 
-  function handleRoleChange(role: UserRole) {
-    setUserRole(role);
-    toast.success(
-      `Account type changed to ${role === "WORKER" ? "Worker" : "Client"}`,
+  if (isUserLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Loader2 className="size-8 animate-spin text-primary" />
+        <p className="mt-4 text-secondary-foreground">
+          Loading your settings...
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="max-w-6xl mx-auto space-y-8"
+    >
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <p className="mt-1 text-sm text-secondary-foreground">
-          Manage your account settings and preferences
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Settings</h1>
+          <p className="mt-1 text-sm text-secondary-foreground">
+            Manage your account settings and preferences
+          </p>
+        </div>
+        <Button
+          type="submit"
+          disabled={isUpdating}
+          className="bg-primary/80 hover:bg-primary text-white"
+        >
+          {isUpdating ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Check className="mr-2 size-4" />
+          )}
+          {isUpdating ? "Saving..." : "Save All Changes"}
+        </Button>
       </div>
 
       {/* Account Type Selection */}
@@ -104,14 +217,14 @@ export default function SettingsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Worker Option */}
           <button
-            onClick={() => handleRoleChange("WORKER")}
+            onClick={() => setValue("role", "WORKER", { shouldDirty: true })}
             className={`relative rounded-xl border-2 p-6 text-left transition-all ${
-              userRole === "WORKER"
+              currentRole === "WORKER"
                 ? "border-primary bg-primary/10"
                 : "border-border bg-background hover:border-primary/50"
             }`}
           >
-            {userRole === "WORKER" && (
+            {currentRole === "WORKER" && (
               <div className="absolute top-3 right-3">
                 <Check className="size-5 text-primary" />
               </div>
@@ -142,14 +255,14 @@ export default function SettingsPage() {
 
           {/* Client Option */}
           <button
-            onClick={() => handleRoleChange("CLIENT")}
+            onClick={() => setValue("role", "CLIENT", { shouldDirty: true })}
             className={`relative rounded-xl border-2 p-6 text-left transition-all ${
-              userRole === "CLIENT"
+              currentRole === "CLIENT"
                 ? "border-accent bg-accent/10"
                 : "border-border bg-background hover:border-accent/50"
             }`}
           >
-            {userRole === "CLIENT" && (
+            {currentRole === "CLIENT" && (
               <div className="absolute top-3 right-3">
                 <Check className="size-5 text-accent" />
               </div>
@@ -308,16 +421,18 @@ export default function SettingsPage() {
             <Input
               id="displayName"
               placeholder={
-                userRole === "WORKER"
+                currentRole === "WORKER"
                   ? "e.g., Acme Dev Studio"
                   : "e.g., TechCorp Inc."
               }
-              value={profile.displayName}
-              onChange={(e) =>
-                setProfile({ ...profile, displayName: e.target.value })
-              }
+              {...register("displayName")}
               className="mt-1.5 border-border bg-background text-white placeholder:text-secondary-foreground/50"
             />
+            {errors.displayName && (
+              <p className="text-xs text-destructive mt-1">
+                {errors.displayName.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -327,23 +442,19 @@ export default function SettingsPage() {
             <Textarea
               id="bio"
               placeholder={
-                userRole === "WORKER"
+                currentRole === "WORKER"
                   ? "Tell clients about your services..."
                   : "Describe the type of projects you are looking for..."
               }
-              value={profile.bio}
-              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              {...register("bio")}
               className="mt-1.5 min-h-25 border-border bg-background text-white placeholder:text-secondary-foreground/50"
             />
+            {errors.bio && (
+              <p className="text-xs text-destructive mt-1">
+                {errors.bio.message}
+              </p>
+            )}
           </div>
-
-          <Button
-            onClick={handleSaveProfile}
-            disabled={isSaving}
-            className="bg-primary/80 hover:bg-primary text-white"
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
         </div>
       </div>
 
@@ -366,37 +477,45 @@ export default function SettingsPage() {
             <div>
               <p className="font-medium text-white">Deposit Notifications</p>
               <p className="text-sm text-secondary-foreground">
-                {userRole === "WORKER"
+                {currentRole === "WORKER"
                   ? "Get notified when a client deposits funds"
                   : "Confirm your deposit was successful"}
               </p>
             </div>
-            <Switch
-              checked={notifications.emailDeposits}
-              onCheckedChange={(checked) =>
-                setNotifications({ ...notifications, emailDeposits: checked })
-              }
+            <Controller
+              name="notifications.emailDeposits"
+              control={control}
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
           </div>
 
           <div className="flex items-center justify-between py-3 border-b border-border">
             <div>
               <p className="font-medium text-white">
-                {userRole === "WORKER"
+                {currentRole === "WORKER"
                   ? "Payout Notifications"
                   : "Release Notifications"}
               </p>
               <p className="text-sm text-secondary-foreground">
-                {userRole === "WORKER"
+                {currentRole === "WORKER"
                   ? "Get notified when funds are released to you"
                   : "Get notified when funds are released"}
               </p>
             </div>
-            <Switch
-              checked={notifications.emailPayouts}
-              onCheckedChange={(checked) =>
-                setNotifications({ ...notifications, emailPayouts: checked })
-              }
+            <Controller
+              name="notifications.emailPayouts"
+              control={control}
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
           </div>
 
@@ -404,19 +523,20 @@ export default function SettingsPage() {
             <div>
               <p className="font-medium text-white">Milestone Updates</p>
               <p className="text-sm text-secondary-foreground">
-                {userRole === "WORKER"
+                {currentRole === "WORKER"
                   ? "Get notified when milestones are approved"
                   : "Get notified when work is submitted for review"}
               </p>
             </div>
-            <Switch
-              checked={notifications.emailMilestones}
-              onCheckedChange={(checked) =>
-                setNotifications({
-                  ...notifications,
-                  emailMilestones: checked,
-                })
-              }
+            <Controller
+              name="notifications.emailMilestones"
+              control={control}
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
           </div>
 
@@ -427,14 +547,15 @@ export default function SettingsPage() {
                 Receive push notifications in your browser
               </p>
             </div>
-            <Switch
-              checked={notifications.browserNotifications}
-              onCheckedChange={(checked) =>
-                setNotifications({
-                  ...notifications,
-                  browserNotifications: checked,
-                })
-              }
+            <Controller
+              name="notifications.browserNotifications"
+              control={control}
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
           </div>
         </div>
@@ -479,6 +600,6 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
-    </div>
+    </form>
   );
 }
