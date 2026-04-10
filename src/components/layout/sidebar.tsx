@@ -6,8 +6,8 @@ import {
   LayoutDashboard,
   Plus,
   Settings,
-  Shield,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -29,14 +29,16 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Shield className="size-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-semibold tracking-tight text-white">
-              TrustBlock
-            </span>
-          </div>
+          <Link href="/">
+            <Image
+              src="/logo.png"
+              alt="TrustBlock Logo"
+              width={200}
+              height={47}
+              className="h-auto w-auto object-contain"
+              priority
+            />
+          </Link>
         </div>
 
         {/* New Escrow Button */}
