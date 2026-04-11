@@ -9,11 +9,14 @@ import {
   Shield,
   Wallet,
 } from "lucide-react";
-import { use, useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { use, useEffect, useMemo, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { mockEscrows } from "@/lib/mock-data";
+import { useRecordDepositDb } from "@/lib/api/hooks/use-escrows-mutations";
+import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
   parseUSDC,
@@ -75,6 +78,11 @@ export default function PaymentPage({
     switchToCorrectNetwork,
   } = useWallet();
 
+  const { data: escrow, isLoading, isError } = useGetEscrow(id);
+  const { mutate: recordDeposit } = useRecordDepositDb();
+
+  const dbRecorded = useRef(false);
+
   const { data: usdcBalance } = useUSDCBalance(address);
   const { data: usdcAllowance } = useUSDCAllowance(address);
 
@@ -99,7 +107,13 @@ export default function PaymentPage({
     reset: resetDeposit,
   } = useDepositFunds();
 
-  const escrow = mockEscrows.find((e) => e.id === id);
+  const isSelfFunding = useMemo(() => {
+    return (
+      isConnected &&
+      address &&
+      escrow?.freelancerAddress?.toLowerCase() === address.toLowerCase()
+    );
+  }, [isConnected, address, escrow]);
 
   const depositStatus = useMemo(() => {
     if (isDepositPending) {
@@ -162,6 +176,25 @@ export default function PaymentPage({
     approvalError,
   ]);
 
+  useEffect(() => {
+    if (
+      isDepositConfirmed &&
+      depositHash &&
+      escrow &&
+      address &&
+      !dbRecorded.current
+    ) {
+      dbRecorded.current = true;
+      recordDeposit({
+        escrowLinkId: escrow.id,
+        txHash: depositHash,
+        fromAddress: address,
+        toAddress: escrow.contractAddress || escrow.freelancerAddress,
+        amount: Number(escrow.totalAmount),
+      });
+    }
+  }, [isDepositConfirmed, depositHash, escrow, address, recordDeposit]);
+
   async function handleApproveUSDC() {
     resetApproval();
     await approveUSDC(escrow?.totalAmount || 0);
@@ -182,7 +215,15 @@ export default function PaymentPage({
     return "upcoming";
   }
 
-  if (!escrow) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !escrow) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center">
@@ -194,6 +235,25 @@ export default function PaymentPage({
           </h1>
           <p className="mt-2 text-secondary-foreground">
             This payment link may have expired or been cancelled.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSelfFunding) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="rounded-full bg-destructive/20 p-4 w-fit mx-auto mb-6">
+            <Shield className="size-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-semibold text-white">
+            Action Not Allowed
+          </h1>
+          <p className="mt-2 text-secondary-foreground">
+            You cannot fund your own escrow. Please ensure you are logged in
+            with a client wallet.
           </p>
         </div>
       </div>
@@ -270,10 +330,16 @@ export default function PaymentPage({
       <header className="border-b border-border bg-secondary">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-              <Shield className="size-5 text-white" />
-            </div>
-            <span className="text-lg font-semibold text-white">TrustBlock</span>
+            <Link href="/">
+              <Image
+                src="/logo.png"
+                alt="TrustBlock Logo"
+                width={200}
+                height={47}
+                className="h-auto w-auto object-contain"
+                priority
+              />
+            </Link>
           </div>
 
           {isConnected && address ? (

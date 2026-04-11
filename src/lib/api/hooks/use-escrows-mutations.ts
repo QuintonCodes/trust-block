@@ -43,3 +43,28 @@ export function useDeleteEscrowDb() {
     },
   });
 }
+
+export function useRecordDepositDb() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      escrowLinkId: string;
+      txHash: string;
+      fromAddress: string;
+      toAddress: string;
+      amount: number;
+    }) => {
+      const response = await axios.post("/api/transactions", data);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      // Refresh queries across the application to reflect locked status
+      queryClient.invalidateQueries({
+        queryKey: ["escrow", variables.escrowLinkId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["escrows"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}

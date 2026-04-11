@@ -36,3 +36,55 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { escrowLinkId, txHash, fromAddress, toAddress, amount } = body;
+
+    if (!escrowLinkId || !txHash || !fromAddress || amount === undefined) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
+    }
+
+    // Check if transaction already exists by tx_hash
+    const existingTx = await db.transaction.findUnique({
+      where: { txHash },
+    });
+
+    if (existingTx) {
+      return NextResponse.json({ transaction: existingTx }, { status: 200 });
+    }
+
+    // Record the on-chain transaction in Prisma
+    const transaction = await db.transaction.create({
+      data: {
+        escrowLinkId,
+        txHash,
+        transactionType: "DEPOSIT",
+        fromAddress,
+        toAddress: toAddress || "",
+        amount,
+      },
+    });
+
+    // Update Escrow status and link the client address to whoever made the deposit
+    await db.escrowLink.update({
+      where: { id: escrowLinkId },
+      data: {
+        status: "LOCKED",
+        clientAddress: fromAddress,
+      },
+    });
+
+    return NextResponse.json({ transaction }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating transaction:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}
