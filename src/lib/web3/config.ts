@@ -11,13 +11,13 @@ export const PRIMARY_CHAIN_ID = isProduction ? polygon.id : hardhat.id;
 // TrustBlock Escrow Contract Address
 export const ESCROW_CONTRACT_ADDRESS = isProduction
   ? "0x..." // TODO: Add real deployment address later
-  : "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
+  : "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
 // USDC Contract Addresses
 export const USDC_CONTRACT_ADDRESS = {
   [polygon.id]: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as const, // Native USDC on Polygon
   [polygonAmoy.id]: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582" as const, // Test USDC on Amoy
-  [hardhat.id]: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  [hardhat.id]: "0x5FbDB2315678afecb367f032d93F642f64180aa3" as const,
 } as const;
 
 // Wagmi configuration

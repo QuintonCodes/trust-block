@@ -79,7 +79,7 @@ contract TrustBlockEscrow is ReentrancyGuard, Ownable {
 
         escrows[escrowId] = Escrow({
             freelancer: freelancer,
-            client: msg.sender,
+            client: address(0),
             totalAmount: totalAmount,
             releasedAmount: 0,
             status: EscrowStatus.AWAITING_FUNDS,
@@ -92,8 +92,15 @@ contract TrustBlockEscrow is ReentrancyGuard, Ownable {
 
     function depositFunds(bytes32 escrowId, uint256 amount) external nonReentrant {
         Escrow storage escrow = escrows[escrowId];
-        require(msg.sender == escrow.client, "Only client can fund");
         require(escrow.status == EscrowStatus.AWAITING_FUNDS, "Not awaiting funds");
+
+        if (escrow.client == address(0)) {
+          require(msg.sender != escrow.freelancer, "Freelancer cannot fund their own escrow");
+            escrow.client = msg.sender;
+        } else {
+          require(msg.sender == escrow.client, "Only client can fund");
+        }
+
         require(amount == escrow.totalAmount, "Must fund exact total amount");
 
         escrow.status = EscrowStatus.LOCKED;

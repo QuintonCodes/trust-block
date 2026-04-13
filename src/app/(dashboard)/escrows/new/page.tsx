@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Controller,
   SubmitHandler,
@@ -27,16 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  useCreateEscrowDb,
-  useUpdateEscrowDb,
-} from "@/lib/api/hooks/use-escrows-mutations";
+import { useCreateEscrowDb } from "@/lib/api/hooks/use-escrows-mutations";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
-import {
-  useApproveUSDC,
-  useCreateEscrow,
-  useDepositFunds,
-} from "@/lib/web3/hooks/use-escrow";
 import { formatUSDC } from "@/lib/web3/utils";
 import { useWallet } from "@/lib/web3/wallet-context";
 
@@ -101,15 +93,6 @@ const formSchema = z
     }
   });
 
-type ProcessStep =
-  | "idle"
-  | "saving_db"
-  | "creating_contract"
-  | "approving"
-  | "depositing"
-  | "updating_db"
-  | "success";
-
 type FormSchema = z.infer<typeof formSchema>;
 
 export default function NewEscrowPage() {
@@ -127,44 +110,14 @@ export default function NewEscrowPage() {
   const [createdEscrowId, setCreatedEscrowId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const actionTracker = useRef({
-    approved: false,
-    deposited: false,
-    updatedDb: false,
-    notified: false,
-  });
-
   const createDbMutation = useCreateEscrowDb();
-  const updateDbMutation = useUpdateEscrowDb();
-
-  const {
-    create: createOnChain,
-    isConfirming: isCreatingOnChain,
-    isConfirmed: isCreatedOnChain,
-    error: createError,
-    reset: resetCreate,
-  } = useCreateEscrow();
-  const {
-    approve: approveUsdc,
-    isConfirming: isApprovingUsdc,
-    isConfirmed: isApprovedUsdc,
-    error: approveError,
-    reset: resetApprove,
-  } = useApproveUSDC();
-  const {
-    deposit: depositOnChain,
-    isConfirming: isDepositingOnChain,
-    isConfirmed: isDepositedOnChain,
-    error: depositError,
-    reset: resetDeposit,
-  } = useDepositFunds();
 
   const {
     control,
     reset: resetForm,
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
@@ -193,12 +146,6 @@ export default function NewEscrowPage() {
       name: "useMilestones",
     }) || false;
 
-  const fundImmediately =
-    useWatch({
-      control: control,
-      name: "fundImmediately",
-    }) || false;
-
   const watchedMilestones =
     useWatch({
       control: control,
@@ -218,126 +165,15 @@ export default function NewEscrowPage() {
   const protocolFee = totalAmount * 0.03;
   const netAmount = totalAmount - protocolFee;
 
-  const hasErrors =
-    createError ||
-    approveError ||
-    depositError ||
-    createDbMutation.isError ||
-    updateDbMutation.isError;
-
-  let currentStep: ProcessStep = "idle";
-
-  if (hasErrors) {
-    currentStep = "idle";
-  } else if (updateDbMutation.isSuccess) {
-    currentStep = "success";
-  } else if (updateDbMutation.isPending || isDepositedOnChain) {
-    currentStep = "updating_db";
-  } else if (isDepositingOnChain || isApprovedUsdc) {
-    currentStep = "depositing";
-  } else if (isApprovingUsdc) {
-    currentStep = "approving";
-  } else if (isCreatedOnChain) {
-    currentStep = fundImmediately ? "approving" : "updating_db";
-  } else if (isCreatingOnChain || createDbMutation.isSuccess) {
-    currentStep = "creating_contract";
-  } else if (createDbMutation.isPending) {
-    currentStep = "saving_db";
-  }
-
-  // Step 1: React to Contract Creation Success
-  useEffect(() => {
-    if (isCreatedOnChain && createdEscrowId) {
-      if (fundImmediately) {
-        if (!actionTracker.current.approved) {
-          actionTracker.current.approved = true;
-          approveUsdc(totalAmount);
-        }
-      } else {
-        if (!actionTracker.current.updatedDb) {
-          actionTracker.current.updatedDb = true;
-          updateDbMutation.mutate({
-            id: createdEscrowId,
-            status: "AWAITING_FUNDS",
-          });
-        }
-      }
-    }
-  }, [
-    isCreatedOnChain,
-    createdEscrowId,
-    fundImmediately,
-    totalAmount,
-    approveUsdc,
-    updateDbMutation,
-  ]);
-
-  // Step 2: React to USDC Approval Success
-  useEffect(() => {
-    if (isApprovedUsdc && createdEscrowId) {
-      if (!actionTracker.current.deposited) {
-        actionTracker.current.deposited = true;
-        depositOnChain(createdEscrowId, totalAmount);
-      }
-    }
-  }, [isApprovedUsdc, createdEscrowId, totalAmount, depositOnChain]);
-
-  // Step 3: React to Deposit Success
-  useEffect(() => {
-    if (isDepositedOnChain && createdEscrowId) {
-      if (!actionTracker.current.updatedDb) {
-        actionTracker.current.updatedDb = true;
-        updateDbMutation.mutate({ id: createdEscrowId, status: "LOCKED" });
-      }
-    }
-  }, [isDepositedOnChain, createdEscrowId, updateDbMutation]);
-
-  // Final Step: React to Database Update Success
-  useEffect(() => {
-    if (updateDbMutation.isSuccess && !actionTracker.current.notified) {
-      actionTracker.current.notified = true;
-      toast.success("Escrow created and updated successfully!");
-    }
-  }, [updateDbMutation.isSuccess]);
-
-  // Watch for errors globally to reset states
-  useEffect(() => {
-    if (hasErrors && !actionTracker.current.notified) {
-      actionTracker.current.notified = true;
-      toast.error("Transaction failed or was rejected. Please try again.");
-    }
-  }, [hasErrors]);
-
-  const generatedLink =
-    currentStep === "success" && createdEscrowId
-      ? `${window.location.origin}/pay/${createdEscrowId}`
-      : null;
-
-  const isSubmitting = currentStep !== "idle" && currentStep !== "success";
-  const submitText =
-    {
-      idle: "Generate Payment Link",
-      saving_db: "Saving Draft...",
-      creating_contract: "Creating On-Chain...",
-      approving: "Approving USDC...",
-      depositing: "Depositing Funds...",
-      updating_db: "Finalizing Setup...",
-      success: "Done!",
-    }[currentStep] || "Processing...";
+  const generatedLink = createdEscrowId
+    ? `${window.location.origin}/pay/${createdEscrowId}`
+    : null;
 
   const onSubmit: SubmitHandler<FormSchema> = async (data) => {
     if (!isConnected || !address) {
       toast.error("Please connect your wallet first");
       return;
     }
-
-    // Reset trackers cleanly for the new submission
-    actionTracker.current = {
-      approved: false,
-      deposited: false,
-      updatedDb: false,
-      notified: false,
-    };
 
     try {
       const contractMilestones =
@@ -363,16 +199,8 @@ export default function NewEscrowPage() {
         milestones: contractMilestones,
       });
 
-      const newEscrowId = dbRes.escrow.id;
-      setCreatedEscrowId(newEscrowId);
-
-      // 2. Trigger on-chain creation
-      await createOnChain(
-        newEscrowId,
-        address as `0x${string}`,
-        totalAmount,
-        contractMilestones.map((m) => ({ title: m.title, amount: m.amount })),
-      );
+      setCreatedEscrowId(dbRes.escrow.id);
+      toast.success("Payment link generated!");
     } catch {
       toast.error("Failed to initialize escrow");
     }
@@ -389,19 +217,7 @@ export default function NewEscrowPage() {
     });
 
     setCreatedEscrowId(null);
-    actionTracker.current = {
-      approved: false,
-      deposited: false,
-      updatedDb: false,
-      notified: false,
-    };
-
-    // Hard reset all mutation states back to "idle"
     createDbMutation.reset();
-    updateDbMutation.reset();
-    resetCreate();
-    resetApprove();
-    resetDeposit();
   }
 
   async function handleCopyLink() {
@@ -422,14 +238,10 @@ export default function NewEscrowPage() {
           </div>
 
           <h1 className="text-2xl font-semibold text-white">
-            {fundImmediately
-              ? "Escrow Locked & Funded!"
-              : "Payment Link Generated!"}
+            Payment Link Generated!
           </h1>
           <p className="mt-2 text-secondary-foreground">
-            {fundImmediately
-              ? "Your funds are securely locked in the smart contract."
-              : "Share this secure payment link with your client to collect funds."}
+            Share this secure payment link with your client to collect funds.
           </p>
 
           <div className="mt-6 rounded-lg border border-border bg-background p-4">
@@ -734,29 +546,6 @@ export default function NewEscrowPage() {
               )}
             </div>
           )}
-
-          <div className="mt-6 border-t border-border pt-4 flex items-center justify-between">
-            <div>
-              <Label htmlFor="fundImmediately" className="text-white">
-                Fund Immediately
-              </Label>
-              <p className="text-xs text-secondary-foreground">
-                Enable if you are self-funding this escrow right now
-              </p>
-            </div>
-            <Controller
-              control={control}
-              name="fundImmediately"
-              render={({ field }) => (
-                <Switch
-                  id="fundImmediately"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={!isConnected || isSubmitting}
-                />
-              )}
-            />
-          </div>
         </div>
 
         {/* Summary Footer */}
@@ -811,7 +600,7 @@ export default function NewEscrowPage() {
             }
             className="flex-1 bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
           >
-            {submitText}
+            {isSubmitting ? "Generating Link..." : "Generate Payment Link"}
           </Button>
         </div>
       </form>

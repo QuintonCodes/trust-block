@@ -21,7 +21,9 @@ import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
   parseUSDC,
   useApproveUSDC,
+  useCreateEscrow,
   useDepositFunds,
+  useEscrowStatus,
   useUSDCAllowance,
   useUSDCBalance,
 } from "@/lib/web3/hooks/use-escrow";
@@ -36,7 +38,7 @@ import {
   useWallet,
 } from "@/lib/web3/wallet-context";
 
-type PaymentStep = "connect" | "approve" | "deposit" | "complete";
+type PaymentStep = "connect" | "create" | "approve" | "deposit" | "complete";
 
 interface Web3Error {
   shortMessage?: string;
@@ -74,6 +76,7 @@ export default function PaymentPage({
     isConnected,
     isConnecting,
     connect,
+    disconnect,
     isCorrectNetwork,
     switchToCorrectNetwork,
   } = useWallet();
@@ -83,10 +86,29 @@ export default function PaymentPage({
 
   const dbRecorded = useRef(false);
 
+  // 1. Blockchain Data Hooks
   const { data: usdcBalance } = useUSDCBalance(address);
   const { data: usdcAllowance } = useUSDCAllowance(address);
+  const { data: onChainEscrow, isLoading: isCheckingOnChain } = useEscrowStatus(
+    escrow?.id,
+  );
 
-  // Wagmi hooks for blockchain interactions
+  const isCreatedOnChain = useMemo(() => {
+    if (!onChainEscrow) return false;
+    return onChainEscrow[0] !== "0x0000000000000000000000000000000000000000";
+  }, [onChainEscrow]);
+
+  // 2. Write Hooks
+  const {
+    create: createEscrowContract,
+    hash: createHash,
+    isPending: isCreatePending,
+    isConfirming: isCreateConfirming,
+    isConfirmed: isCreateConfirmed,
+    error: createError,
+    reset: resetCreate,
+  } = useCreateEscrow();
+
   const {
     approve: approveUSDC,
     hash: approvalHash,
@@ -115,6 +137,21 @@ export default function PaymentPage({
     );
   }, [isConnected, address, escrow]);
 
+  const createStatus = useMemo(() => {
+    if (isCreatePending) return "awaiting-signature";
+    if (createHash && isCreateConfirming) return "confirming";
+    if (isCreateConfirmed || isCreatedOnChain) return "confirmed";
+    if (createError) return "error";
+    return "idle";
+  }, [
+    isCreatePending,
+    createHash,
+    isCreateConfirming,
+    isCreateConfirmed,
+    isCreatedOnChain,
+    createError,
+  ]);
+
   const depositStatus = useMemo(() => {
     if (isDepositPending) {
       return "awaiting-signature";
@@ -135,11 +172,18 @@ export default function PaymentPage({
   ]);
 
   const currentStep = useMemo(() => {
-    if (!isConnected) {
-      return "connect";
-    } else if (depositStatus === "confirmed" || isDepositConfirmed) {
-      return "complete";
-    } else if (escrow && usdcAllowance !== undefined) {
+    if (!isConnected) return "connect";
+    if (depositStatus === "confirmed" || isDepositConfirmed) return "complete";
+
+    if (escrow) {
+      if (!isCreatedOnChain && !isCreateConfirmed) {
+        return "create";
+      }
+
+      if (usdcAllowance === undefined) {
+        return "approve";
+      }
+
       const requiredAmount = parseUSDC(escrow.totalAmount);
       if (usdcAllowance >= requiredAmount || isApprovalConfirmed) {
         return "deposit";
@@ -150,6 +194,8 @@ export default function PaymentPage({
     return "connect"; // Default fallback
   }, [
     isConnected,
+    isCreatedOnChain,
+    isCreateConfirmed,
     usdcAllowance,
     escrow,
     isApprovalConfirmed,
@@ -195,6 +241,24 @@ export default function PaymentPage({
     }
   }, [isDepositConfirmed, depositHash, escrow, address, recordDeposit]);
 
+  async function handleCreate() {
+    resetCreate();
+    const contractMilestones =
+      escrow?.milestones && escrow.milestones.length > 0
+        ? escrow.milestones.map((m) => ({
+            title: m.title,
+            amount: Number(m.amount),
+          }))
+        : [{ title: "Full Project", amount: Number(escrow?.totalAmount) }];
+
+    await createEscrowContract(
+      escrow?.id || "",
+      (escrow?.freelancerAddress as `0x${string}`) || "0x",
+      Number(escrow?.totalAmount || 0),
+      contractMilestones,
+    );
+  }
+
   async function handleApproveUSDC() {
     resetApproval();
     await approveUSDC(escrow?.totalAmount || 0);
@@ -206,7 +270,13 @@ export default function PaymentPage({
   }
 
   function getStepStatus(step: PaymentStep) {
-    const steps: PaymentStep[] = ["connect", "approve", "deposit", "complete"];
+    const steps: PaymentStep[] = [
+      "connect",
+      "create",
+      "approve",
+      "deposit",
+      "complete",
+    ];
     const currentIndex = steps.indexOf(currentStep);
     const stepIndex = steps.indexOf(step);
 
@@ -244,7 +314,7 @@ export default function PaymentPage({
   if (isSelfFunding) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
+        <div className="max-w-md w-full text-center space-y-4">
           <div className="rounded-full bg-destructive/20 p-4 w-fit mx-auto mb-6">
             <Shield className="size-8 text-destructive" />
           </div>
@@ -255,6 +325,14 @@ export default function PaymentPage({
             You cannot fund your own escrow. Please ensure you are logged in
             with a client wallet.
           </p>
+
+          <Button
+            onClick={disconnect}
+            variant="outline"
+            className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+          >
+            Disconnect & Switch Wallet
+          </Button>
         </div>
       </div>
     );
@@ -335,7 +413,7 @@ export default function PaymentPage({
                 src="/logo.png"
                 alt="TrustBlock Logo"
                 width={200}
-                height={47}
+                height={40}
                 className="h-auto w-auto object-contain"
                 priority
               />
@@ -520,7 +598,7 @@ export default function PaymentPage({
 
               {/* Payment Steps */}
               <div className="space-y-3 mb-6">
-                {/* Step 1: Connect Wallet */}
+                {/* Step 1 */}
                 <div
                   className={`rounded-lg border p-3 ${getStepStatus("connect") === "complete" ? "border-accent/30 bg-accent/5" : getStepStatus("connect") === "current" ? "border-primary bg-primary/5" : "border-border bg-background"}`}
                 >
@@ -544,7 +622,46 @@ export default function PaymentPage({
                   </div>
                 </div>
 
-                {/* Step 2: Approve USDC */}
+                {/* Step 2 */}
+                <div
+                  className={`rounded-lg border p-3 ${getStepStatus("create") === "complete" ? "border-accent/30 bg-accent/5" : getStepStatus("create") === "current" ? "border-primary bg-primary/5" : "border-border bg-background"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    {getStepStatus("create") === "complete" ? (
+                      <Check className="size-5 text-accent" />
+                    ) : (
+                      <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
+                        2
+                      </div>
+                    )}
+                    <span
+                      className={
+                        getStepStatus("create") === "complete"
+                          ? "text-accent"
+                          : "text-white"
+                      }
+                    >
+                      Initialize Smart Contract
+                    </span>
+                  </div>
+                  {currentStep === "create" && createStatus !== "idle" && (
+                    <p className="mt-2 text-xs text-secondary-foreground ml-8">
+                      {getTransactionStatusMessage(createStatus)}
+                    </p>
+                  )}
+                  {createHash && currentStep === "create" && (
+                    <a
+                      href={getExplorerTxUrl(createHash, PRIMARY_CHAIN_ID)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 ml-8 inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary"
+                    >
+                      View on explorer <ExternalLink className="size-3" />
+                    </a>
+                  )}
+                </div>
+
+                {/* Step 3 */}
                 <div
                   className={`rounded-lg border p-3 ${getStepStatus("approve") === "complete" ? "border-accent/30 bg-accent/5" : getStepStatus("approve") === "current" ? "border-primary bg-primary/5" : "border-border bg-background"}`}
                 >
@@ -553,7 +670,7 @@ export default function PaymentPage({
                       <Check className="size-5 text-accent" />
                     ) : (
                       <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
-                        2
+                        3
                       </div>
                     )}
                     <span
@@ -583,7 +700,7 @@ export default function PaymentPage({
                   )}
                 </div>
 
-                {/* Step 3: Deposit */}
+                {/* Step 4 */}
                 <div
                   className={`rounded-lg border p-3 ${getStepStatus("deposit") === "complete" ? "border-accent/30 bg-accent/5" : getStepStatus("deposit") === "current" ? "border-primary bg-primary/5" : "border-border bg-background"}`}
                 >
@@ -592,7 +709,7 @@ export default function PaymentPage({
                       <Check className="size-5 text-accent" />
                     ) : (
                       <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
-                        3
+                        4
                       </div>
                     )}
                     <span
@@ -652,13 +769,57 @@ export default function PaymentPage({
                   {CHAIN_CONFIG[PRIMARY_CHAIN_ID as keyof typeof CHAIN_CONFIG]
                     ?.name || "Polygon"}
                 </Button>
+              ) : currentStep === "create" ? (
+                <Button
+                  onClick={handleCreate}
+                  disabled={
+                    isCheckingOnChain || isCreatePending || isCreateConfirming
+                  }
+                  className="w-full bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+                >
+                  {isCheckingOnChain ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Checking Contract...
+                    </>
+                  ) : isCreatePending ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Confirm in Wallet...
+                    </>
+                  ) : isCreateConfirming ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Creating Escrow...
+                    </>
+                  ) : createError ? (
+                    <>
+                      <AlertCircle className="mr-2 size-4" />
+                      Retry Initialization
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 size-4" />
+                      Initialize Escrow Contract
+                    </>
+                  )}
+                </Button>
               ) : currentStep === "approve" ? (
                 <Button
                   onClick={handleApproveUSDC}
-                  disabled={isApprovalPending || isApprovalConfirming}
+                  disabled={
+                    isApprovalPending ||
+                    isApprovalConfirming ||
+                    usdcAllowance === undefined
+                  }
                   className="w-full bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
                 >
-                  {isApprovalPending ? (
+                  {usdcAllowance === undefined ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Checking Allowance...
+                    </>
+                  ) : isApprovalPending ? (
                     <>
                       <Loader2 className="mr-2 size-4 animate-spin" />
                       Confirm in Wallet...
@@ -711,10 +872,12 @@ export default function PaymentPage({
               ) : null}
 
               {/* Error Display */}
-              {(approvalError || depositError) && (
+              {(createError || approvalError || depositError) && (
                 <div className="mt-4 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
                   <p className="text-sm text-destructive">
-                    {getCleanErrorMessage(approvalError || depositError)}
+                    {getCleanErrorMessage(
+                      createError || approvalError || depositError,
+                    )}
                   </p>
                 </div>
               )}
