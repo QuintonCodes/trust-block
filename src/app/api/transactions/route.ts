@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       where: whereClause,
       orderBy: { timestamp: "desc" },
       include: {
-        // Include the related escrow to get the project title easily
         escrowLink: {
           select: {
             projectTitle: true,
@@ -49,35 +48,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedFromAddress = fromAddress.toLowerCase();
+
+    // 1. Ensure the user exists so the foreign key constraint on EscrowLink doesn't fail
+    await db.user.upsert({
+      where: { walletAddress: normalizedFromAddress },
+      update: {},
+      create: {
+        walletAddress: normalizedFromAddress,
+        role: "CLIENT",
+      },
+    });
+
     // Check if transaction already exists by tx_hash
     const existingTx = await db.transaction.findUnique({
       where: { txHash },
     });
 
     if (existingTx) {
+      await db.escrowLink.update({
+        where: { id: escrowLinkId },
+        data: {
+          status: "LOCKED",
+          clientAddress: normalizedFromAddress,
+        },
+      });
       return NextResponse.json({ transaction: existingTx }, { status: 200 });
     }
 
     // Record the on-chain transaction in Prisma
-    const transaction = await db.transaction.create({
-      data: {
-        escrowLinkId,
-        txHash,
-        transactionType: "DEPOSIT",
-        fromAddress,
-        toAddress: toAddress || "",
-        amount,
-      },
-    });
-
-    // Update Escrow status and link the client address to whoever made the deposit
-    await db.escrowLink.update({
-      where: { id: escrowLinkId },
-      data: {
-        status: "LOCKED",
-        clientAddress: fromAddress,
-      },
-    });
+    const [transaction] = await db.$transaction([
+      db.transaction.create({
+        data: {
+          escrowLinkId,
+          txHash,
+          transactionType: "DEPOSIT",
+          fromAddress: normalizedFromAddress,
+          toAddress: toAddress ? toAddress.toLowerCase() : "",
+          amount,
+        },
+      }),
+      db.escrowLink.update({
+        where: { id: escrowLinkId },
+        data: {
+          status: "LOCKED",
+          clientAddress: normalizedFromAddress,
+        },
+      }),
+    ]);
 
     return NextResponse.json({ transaction }, { status: 201 });
   } catch (error) {

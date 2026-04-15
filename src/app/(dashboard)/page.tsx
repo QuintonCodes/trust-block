@@ -90,10 +90,6 @@ export default function DashboardPage() {
 
         {/* Recent Transactions - Takes 1 column */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-white">
-            Recent Transactions
-          </h3>
-
           {hasTransactions ? (
             <RecentTransactions transactions={transactions} />
           ) : (

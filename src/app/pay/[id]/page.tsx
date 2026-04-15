@@ -15,7 +15,10 @@ import { use, useEffect, useMemo, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useRecordDepositDb } from "@/lib/api/hooks/use-escrows-mutations";
+import {
+  useRecordDepositDb,
+  useUpdateEscrowDb,
+} from "@/lib/api/hooks/use-escrows-mutations";
 import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
@@ -83,8 +86,10 @@ export default function PaymentPage({
 
   const { data: escrow, isLoading, isError } = useGetEscrow(id);
   const { mutate: recordDeposit } = useRecordDepositDb();
+  const { mutate: updateEscrow } = useUpdateEscrowDb();
 
   const dbRecorded = useRef(false);
+  const createRecorded = useRef(false);
 
   // 1. Blockchain Data Hooks
   const { data: usdcBalance } = useUSDCBalance(address);
@@ -128,6 +133,21 @@ export default function PaymentPage({
     error: depositError,
     reset: resetDeposit,
   } = useDepositFunds();
+
+  useEffect(() => {
+    if (
+      (isCreateConfirmed || isCreatedOnChain) &&
+      escrow?.status === "DRAFT" &&
+      !createRecorded.current
+    ) {
+      createRecorded.current = true;
+
+      updateEscrow({
+        id: escrow.id,
+        status: "AWAITING_FUNDS",
+      });
+    }
+  }, [isCreateConfirmed, isCreatedOnChain, escrow, updateEscrow]);
 
   const isSelfFunding = useMemo(() => {
     return (
