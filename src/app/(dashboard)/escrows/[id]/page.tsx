@@ -42,7 +42,7 @@ export default function EscrowDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { address } = useWallet();
+  const { address, isMounted } = useWallet();
 
   // Fetch Escrow Data
   const {
@@ -137,6 +137,14 @@ export default function EscrowDetailPage({
     isAutoReleaseConfirmed,
     refetchEscrow,
   ]);
+
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isEscrowLoading) {
     return (

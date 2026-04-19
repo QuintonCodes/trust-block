@@ -5,7 +5,13 @@ import {
   QueryClientProvider,
   useMutation,
 } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import {
   useChainId,
@@ -26,6 +32,7 @@ type WalletContextType = {
   address: `0x${string}` | undefined;
   isConnected: boolean;
   isConnecting: boolean;
+  isMounted: boolean;
   chainId: number | undefined;
   isCorrectNetwork: boolean;
   networkName: string;
@@ -64,6 +71,8 @@ const queryClient = new QueryClient({
 const WalletContext = createContext<WalletContextType | null>(null);
 
 function WalletContextInner({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+
   const { address, isConnected, isConnecting } = useConnection();
   const chainId = useChainId();
   const connectors = useConnectors();
@@ -74,17 +83,9 @@ function WalletContextInner({ children }: { children: ReactNode }) {
 
   const { mutate: syncLogin } = useMutation({
     mutationFn: async (walletAddress: string) => {
-      // Calling your Server Action directly!
       const response = await syncUserLogin(walletAddress);
       if (!response.success) throw new Error(response.error);
       return response.user;
-    },
-    onSuccess: () => {
-      console.log("User synced with database successfully");
-    },
-    onError: (error) => {
-      console.error("Failed to sync user to DB:", error);
-      // You could also add a toast.error here if you want
     },
   });
 
@@ -93,19 +94,27 @@ function WalletContextInner({ children }: { children: ReactNode }) {
     ? CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG]
     : undefined;
 
-  // 1. Sync User to Database
+  // 1. Resolve Hydration Mismatch
   useEffect(() => {
-    if (isConnected && address) {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 2. Sync User to Database
+  useEffect(() => {
+    if (isMounted && isConnected && address) {
       syncLogin(address);
     }
-  }, [isConnected, address, syncLogin]);
+  }, [isMounted, isConnected, address, syncLogin]);
 
-  // 2. Listen for external wallet disconnects (e.g., user locks MetaMask or it crashes)
+  // 3. Listen for external wallet disconnects
   useConnectionEffect({
     onDisconnect() {
       console.log("Wallet disconnected externally");
       toast.error("Wallet disconnected. Please check MetaMask.");
-      // Ensure the internal wagmi state is wiped clean
       disconnectMutation();
     },
   });
@@ -173,6 +182,7 @@ function WalletContextInner({ children }: { children: ReactNode }) {
         address,
         isConnected,
         isConnecting,
+        isMounted,
         chainId,
         isCorrectNetwork,
         networkName: currentChainConfig?.name || `Unknown Network`,

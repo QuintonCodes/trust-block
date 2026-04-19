@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Check,
   Copy,
+  Loader2,
   Plus,
   Trash2,
   Wallet,
@@ -99,6 +100,7 @@ export default function NewEscrowPage() {
   const {
     address,
     isConnected,
+    isMounted,
     connect,
     isCorrectNetwork,
     switchToCorrectNetwork,
@@ -227,6 +229,15 @@ export default function NewEscrowPage() {
       toast.success("Link copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     }
+  }
+
+  // Hydration check
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   if (generatedLink) {

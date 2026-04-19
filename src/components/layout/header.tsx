@@ -36,6 +36,7 @@ export function Header() {
     address,
     isConnected,
     isConnecting,
+    isMounted,
     connect,
     disconnect,
     isCorrectNetwork,
@@ -66,7 +67,12 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {isConnected && address ? (
+        {!isMounted ? (
+          <Button disabled className="bg-primary/80 text-white">
+            <Wallet className="mr-2 size-4" />
+            Loading...
+          </Button>
+        ) : isConnected && address ? (
           <>
             {!isCorrectNetwork && (
               <Button

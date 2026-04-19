@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   Loader2,
+  ReceiptText,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -18,6 +19,7 @@ import {
   getExplorerTxUrl,
   truncateAddress,
 } from "@/lib/web3/utils";
+import { useWallet } from "@/lib/web3/wallet-context";
 
 const typeFilters: { label: string; value: TransactionType | "ALL" }[] = [
   { label: "All", value: "ALL" },
@@ -55,13 +57,39 @@ const transactionTypeConfig = {
 };
 
 export default function TransactionsPage() {
+  const { address, isConnected, isMounted } = useWallet();
   const [typeFilter, setTypeFilter] = useState<TransactionType | "ALL">("ALL");
 
   const {
     data: transactions = [],
     isLoading,
     isError,
-  } = useGetTransactions(typeFilter);
+  } = useGetTransactions(typeFilter, address);
+
+  if (!isMounted) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 text-center">
+        <div className="p-4 rounded-full bg-secondary">
+          <ReceiptText className="size-8 text-secondary-foreground" />
+        </div>
+        <h2 className="text-2xl font-semibold text-white">
+          Connect Your Wallet
+        </h2>
+        <p className="max-w-md text-secondary-foreground">
+          Please connect your wallet using the button in the top right corner to
+          view your transaction history.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -79,7 +107,7 @@ export default function TransactionsPage() {
           variant="outline"
           className="border-border text-secondary-foreground hover:text-white"
         >
-          <Download className="mr-2 h-4 w-4" />
+          <Download className="w-4 h-4 mr-2" />
           Export CSV
         </Button>
       </div>
@@ -104,10 +132,10 @@ export default function TransactionsPage() {
       </div>
 
       {/* Transactions Table */}
-      <div className="rounded-xl border border-border bg-secondary overflow-hidden">
+      <div className="overflow-hidden border rounded-xl border-border bg-secondary">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-64 text-secondary-foreground">
-            <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
+            <Loader2 className="w-8 h-8 mb-4 animate-spin text-primary" />
             <p>Loading transactions...</p>
           </div>
         ) : isError ? (
@@ -119,22 +147,22 @@ export default function TransactionsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-left uppercase text-secondary-foreground">
                     Type
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-left uppercase text-secondary-foreground">
                     Project
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-left uppercase text-secondary-foreground">
                     From / To
                   </th>
-                  <th className="px-6 py-4 text-right text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-right uppercase text-secondary-foreground">
                     Amount
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-left uppercase text-secondary-foreground">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-right text-xs font-medium uppercase tracking-wider text-secondary-foreground">
+                  <th className="px-6 py-4 text-xs font-medium tracking-wider text-right uppercase text-secondary-foreground">
                     TX
                   </th>
                 </tr>
@@ -147,7 +175,7 @@ export default function TransactionsPage() {
                   return (
                     <tr
                       key={tx.id}
-                      className="hover:bg-border/30 transition-colors"
+                      className="transition-colors hover:bg-border/30"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -180,7 +208,7 @@ export default function TransactionsPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <span
                           className={`text-sm font-medium ${
                             tx.transactionType === "DEPOSIT"
@@ -197,15 +225,15 @@ export default function TransactionsPage() {
                           {formatDate(tx.timestamp)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
                         <button
                           onClick={() =>
                             window.open(getExplorerTxUrl(tx.txHash), "_blank")
                           }
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-secondary-foreground hover:bg-border hover:text-white transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs transition-colors rounded-lg text-secondary-foreground hover:bg-border hover:text-white"
                         >
                           {truncateAddress(tx.txHash, 6, 4)}
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="w-3 h-3" />
                         </button>
                       </td>
                     </tr>

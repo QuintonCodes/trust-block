@@ -29,7 +29,7 @@ const statusFilters: { label: string; value: EscrowStatus | "ALL" }[] = [
 ];
 
 export default function EscrowsPage() {
-  const { address, isConnected } = useWallet();
+  const { address, isConnected, isMounted } = useWallet();
   const [statusFilter, setStatusFilter] = useState<EscrowStatus | "ALL">("ALL");
 
   // 2. Initialize React Hook Form
@@ -54,12 +54,24 @@ export default function EscrowsPage() {
   );
 
   // --- States ---
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
-        <Wallet className="size-12 text-secondary-foreground" />
-        <h2 className="text-xl font-medium text-white">Connect Your Wallet</h2>
-        <p className="text-secondary-foreground max-w-sm">
+        <div className="p-4 bg-secondary rounded-full">
+          <Wallet className="size-8 text-secondary-foreground" />
+        </div>
+        <h2 className="text-2xl font-semibold text-white">
+          Connect Your Wallet
+        </h2>
+        <p className="text-secondary-foreground max-w-md">
           Please connect your wallet to view and manage your active escrows.
         </p>
       </div>

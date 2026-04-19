@@ -10,14 +10,18 @@ export type TransactionWithProject = Transaction & {
   };
 };
 
-export function useGetTransactions(typeFilter: TransactionType | "ALL") {
+export function useGetTransactions(
+  typeFilter: TransactionType | "ALL",
+  address?: string,
+) {
   return useQuery({
-    queryKey: ["transactions", typeFilter],
+    queryKey: ["transactions", typeFilter, address],
     queryFn: async () => {
       const response = await axios.get<{
         transactions: TransactionWithProject[];
-      }>("/api/transactions", { params: { type: typeFilter } });
+      }>("/api/transactions", { params: { type: typeFilter, address } });
       return response.data.transactions;
     },
+    enabled: !!address,
   });
 }

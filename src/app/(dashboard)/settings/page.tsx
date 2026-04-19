@@ -8,6 +8,7 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  Settings,
   Shield,
   User,
   Users,
@@ -49,6 +50,7 @@ export default function SettingsPage() {
   const {
     address,
     isConnected,
+    isMounted,
     connect,
     isCorrectNetwork,
     switchToCorrectNetwork,
@@ -134,30 +136,27 @@ export default function SettingsPage() {
     }
   };
 
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isConnected || !address) {
     return (
-      <div className="max-w-3xl mx-auto mt-12">
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-secondary p-12 text-center space-y-5">
-          <div className="rounded-full bg-primary/10 p-4">
-            <Shield className="size-10 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-semibold text-white">
-              Authentication Required
-            </h2>
-            <p className="mt-2 text-secondary-foreground max-w-md">
-              Please connect your Web3 wallet to access and manage your profile,
-              roles, and platform settings.
-            </p>
-          </div>
-          <Button
-            onClick={connect}
-            className="bg-primary hover:bg-primary/90 text-white mt-2"
-          >
-            <Wallet className="mr-2 size-4" />
-            Connect Wallet
-          </Button>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="p-4 rounded-full bg-secondary">
+          <Settings className="size-8 text-secondary-foreground" />
         </div>
+        <h2 className="text-2xl font-semibold text-white">
+          Connect Your Wallet
+        </h2>
+        <p className="max-w-md text-secondary-foreground">
+          Please connect your wallet using the button in the top right corner to
+          access and manage your profile, roles, and platform settings.
+        </p>
       </div>
     );
   }
@@ -189,7 +188,7 @@ export default function SettingsPage() {
         <Button
           type="submit"
           disabled={isUpdating}
-          className="bg-primary/80 hover:bg-primary text-white"
+          className="text-white bg-primary/80 hover:bg-primary"
         >
           {isUpdating ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
@@ -201,9 +200,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Account Type Selection */}
-      <div className="rounded-xl border border-border bg-secondary p-6">
+      <div className="p-6 border rounded-xl border-border bg-secondary">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-lg bg-chart-5/10 p-2">
+          <div className="p-2 rounded-lg bg-chart-5/10">
             <Users className="size-5 text-chart-5" />
           </div>
           <div>
@@ -229,7 +228,7 @@ export default function SettingsPage() {
                 <Check className="size-5 text-primary" />
               </div>
             )}
-            <div className="rounded-lg bg-primary/20 p-2 w-fit mb-3">
+            <div className="p-2 mb-3 rounded-lg bg-primary/20 w-fit">
               <Briefcase className="size-5 text-primary" />
             </div>
             <h3 className="font-medium text-white">Worker / Freelancer</h3>
@@ -267,7 +266,7 @@ export default function SettingsPage() {
                 <Check className="size-5 text-accent" />
               </div>
             )}
-            <div className="rounded-lg bg-accent/20 p-2 w-fit mb-3">
+            <div className="p-2 mb-3 rounded-lg bg-accent/20 w-fit">
               <Users className="size-5 text-accent" />
             </div>
             <h3 className="font-medium text-white">Client</h3>
@@ -292,7 +291,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="mt-4 p-4 rounded-lg border border-tb-warning/30 bg-tb-warning/5">
+        <div className="p-4 mt-4 border rounded-lg border-tb-warning/30 bg-tb-warning/5">
           <p className="text-sm text-tb-warning">
             <strong>Note:</strong> You can use TrustBlock as both a worker and
             client. This setting controls your default dashboard view and which
@@ -302,9 +301,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Wallet Connection */}
-      <div className="rounded-xl border border-border bg-secondary p-6">
+      <div className="p-6 border rounded-xl border-border bg-secondary">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-lg bg-primary/10 p-2">
+          <div className="p-2 rounded-lg bg-primary/10">
             <Wallet className="size-5 text-primary" />
           </div>
           <div>
@@ -317,7 +316,7 @@ export default function SettingsPage() {
 
         {isConnected && address ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg border-border bg-background">
               <div>
                 <p className="text-sm text-secondary-foreground">
                   Connected Address
@@ -355,7 +354,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg border-border bg-background">
               <div>
                 <p className="text-sm text-secondary-foreground">Network</p>
                 <p
@@ -368,14 +367,14 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 {isCorrectNetwork ? (
                   <>
-                    <div className="size-2 rounded-full bg-accent" />
+                    <div className="rounded-full size-2 bg-accent" />
                     <span className="text-sm text-accent">Connected</span>
                   </>
                 ) : (
                   <Button
                     onClick={switchToCorrectNetwork}
                     size="sm"
-                    className="bg-tb-warning/80 hover:bg-tb-warning text-black"
+                    className="text-black bg-tb-warning/80 hover:bg-tb-warning"
                   >
                     Switch Network
                   </Button>
@@ -384,13 +383,13 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-secondary-foreground mb-4">
+          <div className="py-8 text-center">
+            <p className="mb-4 text-secondary-foreground">
               Connect your wallet to access all features
             </p>
             <Button
               onClick={connect}
-              className="bg-primary/80 hover:bg-primary text-white"
+              className="text-white bg-primary/80 hover:bg-primary"
             >
               <Wallet className="mr-2 size-4" />
               Connect Wallet
@@ -400,9 +399,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Profile Settings */}
-      <div className="rounded-xl border border-border bg-secondary p-6">
+      <div className="p-6 border rounded-xl border-border bg-secondary">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-lg bg-accent/10 p-2">
+          <div className="p-2 rounded-lg bg-accent/10">
             <User className="size-5 text-accent" />
           </div>
           <div>
@@ -429,7 +428,7 @@ export default function SettingsPage() {
               className="mt-1.5 border-border bg-background text-white placeholder:text-secondary-foreground/50"
             />
             {errors.displayName && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="mt-1 text-xs text-destructive">
                 {errors.displayName.message}
               </p>
             )}
@@ -450,7 +449,7 @@ export default function SettingsPage() {
               className="mt-1.5 min-h-25 border-border bg-background text-white placeholder:text-secondary-foreground/50"
             />
             {errors.bio && (
-              <p className="text-xs text-destructive mt-1">
+              <p className="mt-1 text-xs text-destructive">
                 {errors.bio.message}
               </p>
             )}
@@ -459,9 +458,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Notification Settings */}
-      <div className="rounded-xl border border-border bg-secondary p-6">
+      <div className="p-6 border rounded-xl border-border bg-secondary">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-lg bg-tb-warning/10 p-2">
+          <div className="p-2 rounded-lg bg-tb-warning/10">
             <Bell className="size-5 text-tb-warning" />
           </div>
           <div>
@@ -562,9 +561,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Security */}
-      <div className="rounded-xl border border-border bg-secondary p-6">
+      <div className="p-6 border rounded-xl border-border bg-secondary">
         <div className="flex items-center gap-3 mb-6">
-          <div className="rounded-lg bg-destructive/10 p-2">
+          <div className="p-2 rounded-lg bg-destructive/10">
             <Shield className="size-5 text-destructive" />
           </div>
           <div>
@@ -575,7 +574,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-background p-4">
+        <div className="p-4 border rounded-lg border-border bg-background">
           <div className="flex items-start gap-3">
             <div className="rounded-full bg-accent/20 p-1.5 mt-0.5">
               <Check className="size-3.5 text-accent" />
@@ -584,7 +583,7 @@ export default function SettingsPage() {
               <p className="font-medium text-white">
                 Sign-In with Ethereum (SIWE)
               </p>
-              <p className="text-sm text-secondary-foreground mt-1">
+              <p className="mt-1 text-sm text-secondary-foreground">
                 Your wallet address is your identity. No passwords needed - your
                 cryptographic signature proves ownership.
               </p>
@@ -592,7 +591,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="mt-4 p-4 rounded-lg border border-tb-warning/30 bg-tb-warning/5">
+        <div className="p-4 mt-4 border rounded-lg border-tb-warning/30 bg-tb-warning/5">
           <p className="text-sm text-tb-warning">
             <strong>Important:</strong> Never share your wallet&apos;s private
             key or seed phrase with anyone. TrustBlock will never ask for this

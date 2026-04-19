@@ -7,15 +7,19 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type");
-
-    // Build the where clause conditionally based on the filter
-    const whereClause =
-      type && type !== "ALL"
-        ? { transactionType: type as TransactionType }
-        : {};
+    const address = searchParams.get("address");
 
     const transactions = await db.transaction.findMany({
-      where: whereClause,
+      where: {
+        transactionType:
+          type && type !== "ALL" ? (type as TransactionType) : undefined,
+        OR: address
+          ? [
+              { fromAddress: address.toLowerCase() },
+              { toAddress: address.toLowerCase() },
+            ]
+          : undefined,
+      },
       orderBy: { timestamp: "desc" },
       include: {
         escrowLink: {
@@ -66,13 +70,21 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingTx) {
-      await db.escrowLink.update({
-        where: { id: escrowLinkId },
-        data: {
-          status: "LOCKED",
-          clientAddress: normalizedFromAddress,
-        },
-      });
+      await db.$transaction([
+        db.escrowLink.update({
+          where: { id: escrowLinkId },
+          data: {
+            status: "LOCKED",
+            clientAddress: normalizedFromAddress,
+          },
+        }),
+        db.milestone.updateMany({
+          where: { escrowLinkId: escrowLinkId },
+          data: {
+            status: "FUNDED",
+          },
+        }),
+      ]);
       return NextResponse.json({ transaction: existingTx }, { status: 200 });
     }
 
@@ -93,6 +105,12 @@ export async function POST(req: NextRequest) {
         data: {
           status: "LOCKED",
           clientAddress: normalizedFromAddress,
+        },
+      }),
+      db.milestone.updateMany({
+        where: { escrowLinkId: escrowLinkId },
+        data: {
+          status: "FUNDED",
         },
       }),
     ]);

@@ -11,20 +11,29 @@ import { useDashboardData } from "@/lib/api/hooks/use-dashboard";
 import { useWallet } from "@/lib/web3/wallet-context";
 
 export default function DashboardPage() {
-  const { address, isConnected } = useWallet();
+  const { address, isConnected, isMounted } = useWallet();
   const { data, isLoading, isError } = useDashboardData(address);
 
-  // 1. Not Connected State
+  // 1. Hydration check
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // 2. Not Connected State
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-        <div className="p-4 bg-secondary rounded-full">
+        <div className="p-4 rounded-full bg-secondary">
           <ReceiptText className="size-8 text-secondary-foreground" />
         </div>
         <h2 className="text-2xl font-semibold text-white">
           Welcome to TrustBlock
         </h2>
-        <p className="text-secondary-foreground max-w-md">
+        <p className="max-w-md text-secondary-foreground">
           Please connect your wallet using the button in the top right corner to
           view your dashboard.
         </p>
@@ -32,7 +41,7 @@ export default function DashboardPage() {
     );
   }
 
-  // 2. Loading State
+  // 3. Loading State
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -41,7 +50,7 @@ export default function DashboardPage() {
     );
   }
 
-  // 3. Error State
+  // 4. Error State
   if (isError || !data) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -64,7 +73,7 @@ export default function DashboardPage() {
       {/* Main Content Grid */}
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Active Escrows - Takes 2 columns */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4 lg:col-span-2">
           {hasActiveEscrows ? (
             <EscrowsList
               escrows={activeEscrows.slice(0, 4)}
@@ -73,9 +82,9 @@ export default function DashboardPage() {
           ) : (
             // Empty State UI for Escrows
             <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed rounded-lg border-border bg-secondary/20">
-              <FileX className="size-10 text-secondary-foreground mb-4" />
-              <h4 className="text-white font-medium mb-2">No active escrows</h4>
-              <p className="text-sm text-secondary-foreground mb-6 max-w-sm">
+              <FileX className="mb-4 size-10 text-secondary-foreground" />
+              <h4 className="mb-2 font-medium text-white">No active escrows</h4>
+              <p className="max-w-sm mb-6 text-sm text-secondary-foreground">
                 You don&apos;t have any ongoing projects right now. Create a new
                 escrow to secure your next payment.
               </p>
@@ -95,7 +104,7 @@ export default function DashboardPage() {
           ) : (
             // Empty State UI for Transactions
             <div className="flex flex-col items-center justify-center p-8 text-center border border-dashed rounded-lg border-border bg-secondary/20 h-75">
-              <ReceiptText className="size-8 text-secondary-foreground mb-4" />
+              <ReceiptText className="mb-4 size-8 text-secondary-foreground" />
               <p className="text-sm text-secondary-foreground">
                 No recent transactions found. Activity will appear here once an
                 escrow is funded.
