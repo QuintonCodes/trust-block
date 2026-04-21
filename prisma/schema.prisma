@@ -51,6 +51,11 @@ enum MilestoneStatus {
   AUTO_RELEASED         // Released after 3 days of client inactivity
 }
 
+enum SubmissionType {
+  LINK
+  FILE
+}
+
 // Transaction Type Enum
 enum TransactionType {
   DEPOSIT
@@ -95,6 +100,9 @@ model Milestone {
   dueDate        DateTime?       @map("due_date")
   submittedAt    DateTime?       @map("submitted_at")    // When work was marked as complete
   autoReleaseAt  DateTime?       @map("auto_release_at") // 3 days after submission if client is silent
+
+  submissionType SubmissionType? @map("submission_type")
+  submissionUrl  String?         @map("submission_url")
 
   // Relations
   escrowLink EscrowLink @relation(fields: [escrowLinkId], references: [id], onDelete: Cascade)

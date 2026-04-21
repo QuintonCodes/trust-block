@@ -64,7 +64,7 @@
   --muted-foreground: oklch(0.7691 0.0278 257.04); /* #a9b5c6 */
   --accent: oklch(0.651 0.1388 162.66); /* #0fa976 */
   --accent-foreground: oklch(1 0 0); /* #ffffff */
-  --destructive: oklch(0.577 0.245 27.325); /* ##e7000b */
+  --destructive: oklch(0.577 0.245 27.325); /* #e7000b */
   --border: oklch(0.3717 0.0392 257.29); /* #334155 */
   --input: oklch(0.3717 0.0392 257.29); /* #334155 */
   --ring: oklch(0.5106 0.2301 276.97); /* #4f46e5 */

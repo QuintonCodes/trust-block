@@ -24,8 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
+import { useSubmitWorkMutation } from "@/lib/api/hooks/use-submit-work";
 import { Milestone } from "@/lib/types";
-import { PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
   useApproveMilestone,
   useAutoReleaseMilestone,
@@ -58,10 +58,12 @@ export default function EscrowDetailPage({
     refetch: refetchEscrow,
   } = useGetEscrow(id);
 
+  const { mutateAsync: saveSubmissionToDb, isPending: isSavingDb } =
+    useSubmitWorkMutation();
+
   // Wagmi hooks
   const {
     approve: approveMilestone,
-    hash: approveHash,
     isPending: isApprovePending,
     isConfirming: isApproveConfirming,
     isConfirmed: isApproveConfirmed,
@@ -71,7 +73,6 @@ export default function EscrowDetailPage({
 
   const {
     submit: submitMilestone,
-    hash: submitHash,
     isPending: isSubmitPending,
     isConfirming: isSubmitConfirming,
     isConfirmed: isSubmitConfirmed,
@@ -81,7 +82,6 @@ export default function EscrowDetailPage({
 
   const {
     autoRelease,
-    hash: autoReleaseHash,
     isPending: isAutoReleasePending,
     isConfirming: isAutoReleaseConfirming,
     isConfirmed: isAutoReleaseConfirmed,
@@ -89,11 +89,12 @@ export default function EscrowDetailPage({
     reset: resetAutoRelease,
   } = useAutoReleaseMilestone();
 
-  const [submitModalOpen, setSubmitModalOpen] = useState(false);
+  const [submitModalState, setSubmitModalState] = useState<{
+    isOpen: boolean;
+    milestone: Milestone | null;
+    index: number;
+  }>({ isOpen: false, milestone: null, index: -1 });
   const [selectedMilestone, setSelectedMilestone] = useState<number | null>(
-    null,
-  );
-  const [milestoneToSubmit, setMilestoneToSubmit] = useState<Milestone | null>(
     null,
   );
   const [dueDateCountdown, setDueDateCountdown] = useState("");
@@ -227,7 +228,6 @@ export default function EscrowDetailPage({
   }
 
   const transactions = escrow.transactions || [];
-  const activeHash = approveHash || submitHash || autoReleaseHash;
 
   // Determine user role for this escrow
   const isWorker =
@@ -254,12 +254,6 @@ export default function EscrowDetailPage({
     setSelectedMilestone(milestoneIndex);
     resetApprove();
     await approveMilestone(escrow?.id || "", milestoneIndex);
-  }
-
-  async function handleSubmitMilestone(milestoneIndex: number) {
-    setSelectedMilestone(milestoneIndex);
-    resetSubmit();
-    await submitMilestone(escrow?.id || "", milestoneIndex);
   }
 
   async function handleAutoRelease(milestoneIndex: number) {
@@ -307,7 +301,7 @@ export default function EscrowDetailPage({
     }
   }
 
-  const getMilestoneDueCountdown = (dueDate: Date | null) => {
+  function getMilestoneDueCountdown(dueDate: Date | null) {
     if (!dueDate) return null;
     const now = new Date();
     const due = new Date(dueDate);
@@ -328,27 +322,39 @@ export default function EscrowDetailPage({
       };
     }
     return { overdue: false, text: `${hours}h left`, urgent: true };
-  };
+  }
 
-  const openSubmitModal = (milestone: Milestone, index: number) => {
-    setMilestoneToSubmit(milestone);
-    setMilestoneIndex(index);
-    setSubmitModalOpen(true);
-  };
+  function openSubmitModal(milestone: Milestone, index: number) {
+    setSubmitModalState({ isOpen: true, milestone, index });
+  }
 
-  const handleSubmitWork = async (
+  async function handleSubmitWork(
     submissionType: "link" | "file",
     submissionData: string,
-  ) => {
-    if (!milestoneToSubmit) return;
+  ) {
+    if (!submitModalState.milestone || submitModalState.index === -1 || !escrow)
+      return;
 
-    setSelectedMilestone(milestoneIndex);
+    setSelectedMilestone(submitModalState.index);
     resetSubmit();
 
-    // In production, you would also save the submission type and URL to the database
-    // For now, we proceed with the on-chain submission
-    await submitMilestone(escrow.id, milestoneIndex);
-  };
+    try {
+      await saveSubmissionToDb({
+        escrowId: escrow.id,
+        milestoneId: submitModalState.milestone.id,
+        submissionType: submissionType === "link" ? "LINK" : "FILE",
+        submissionUrl: submissionData,
+      });
+
+      await submitMilestone(escrow.id, submitModalState.index);
+
+      setSubmitModalState({ isOpen: false, milestone: null, index: -1 });
+    } catch (error) {
+      console.error("Failed to submit work:", error);
+      toast.error("Failed to save submission data. Please try again.");
+      setSelectedMilestone(null);
+    }
+  }
 
   return (
     <div>
@@ -416,19 +422,19 @@ export default function EscrowDetailPage({
           <div
             className={`rounded-xl border p-4 ${
               dueDateCountdown === "Overdue"
-                ? "border-[#EF4444]/30 bg-[#EF4444]/10"
+                ? "border-destructive/30 bg-destructive/10"
                 : dueDateCountdown.includes("remaining") &&
                     parseInt(dueDateCountdown) <= 3
-                  ? "border-[#F59E0B]/30 bg-[#F59E0B]/10"
-                  : "border-[#4F46E5]/30 bg-[#4F46E5]/10"
+                  ? "border-tb-warning/30 bg-tb-warning/10"
+                  : "border-primary/30 bg-primary/10"
             }`}
           >
             <div className="flex items-center gap-3">
               <Calendar
                 className={`h-5 w-5 ${
                   dueDateCountdown === "Overdue"
-                    ? "text-[#EF4444]"
-                    : "text-[#4F46E5]"
+                    ? "text-destructive"
+                    : "text-primary"
                 }`}
               />
               <div>
@@ -438,8 +444,8 @@ export default function EscrowDetailPage({
                 <p
                   className={`text-sm ${
                     dueDateCountdown === "Overdue"
-                      ? "text-[#EF4444]"
-                      : "text-[#A9B5C6]"
+                      ? "text-destructive"
+                      : "text-secondary-foreground"
                   }`}
                 >
                   {dueDateCountdown}
@@ -515,7 +521,8 @@ export default function EscrowDetailPage({
                           <div className="mt-0.5">
                             {milestoneStatusIcon(milestone.status)}
                           </div>
-                          <div className="flex-1">
+
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <h3 className="font-medium text-white">
                                 {index + 1}. {milestone.title}
@@ -539,13 +546,13 @@ export default function EscrowDetailPage({
                             {/* Submission Info */}
                             {milestone.submissionUrl &&
                               (isInReview || isPaid) && (
-                                <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#334155] bg-[#0F172A] p-3">
+                                <div className="flex items-center w-full gap-2 p-3 mt-3 border rounded-lg border-border bg-sidebar">
                                   {milestone.submissionType === "LINK" ? (
-                                    <LinkIcon className="size-4 text-primary" />
+                                    <LinkIcon className="size-4 text-primary shrink-0" />
                                   ) : (
-                                    <FileArchive className="size-4 text-accent" />
+                                    <FileArchive className="size-4 text-accent shrink-0" />
                                   )}
-                                  <span className="text-sm text-[#A9B5C6] flex-1 truncate">
+                                  <span className="flex-1 block min-w-0 text-sm truncate text-secondary-foreground">
                                     {milestone.submissionType === "LINK"
                                       ? "Deployment"
                                       : "File"}
@@ -555,7 +562,8 @@ export default function EscrowDetailPage({
                                     href={milestone.submissionUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-primary/80 hover:text-primary"
+                                    className=" text-primary/80 hover:text-primary shrink-0"
+                                    title="Open link"
                                   >
                                     {milestone.submissionType === "LINK" ? (
                                       <ExternalLink className="size-4" />
@@ -599,8 +607,8 @@ export default function EscrowDetailPage({
                                 </div>
                               )}
 
-                              {milestone.dueDate && (
-                                <p className="mt-2 text-xs text-secondary-foreground">
+                              {milestone.dueDate && isPaid && (
+                                <p className="text-secondary-foreground">
                                   Due: {formatDate(milestone.dueDate)}
                                 </p>
                               )}
@@ -636,7 +644,9 @@ export default function EscrowDetailPage({
 
                                 {canSubmit && (
                                   <Button
-                                    onClick={() => handleSubmitMilestone(index)}
+                                    onClick={() =>
+                                      openSubmitModal(milestone, index)
+                                    }
                                     disabled={isLoading}
                                     size="sm"
                                     className="text-white bg-ring/80 hover:bg-ring"
@@ -679,22 +689,6 @@ export default function EscrowDetailPage({
                                   </Button>
                                 )}
                               </div>
-                            )}
-
-                            {/* Transaction hash link */}
-                            {selectedMilestone === index && activeHash && (
-                              <a
-                                href={getExplorerTxUrl(
-                                  activeHash,
-                                  PRIMARY_CHAIN_ID,
-                                )}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 mt-2 text-xs text-ring hover:text-primary/80"
-                              >
-                                View transaction{" "}
-                                <ExternalLink className="size-3" />
-                              </a>
                             )}
                           </div>
                         </div>
@@ -895,17 +889,16 @@ export default function EscrowDetailPage({
       </div>
 
       {/* Submit Work Modal */}
-      {milestoneToSubmit && (
+      {submitModalState.milestone && (
         <SubmitWorkModal
-          isOpen={submitModalOpen}
-          onClose={() => {
-            setSubmitModalOpen(false);
-            setMilestoneToSubmit(null);
-          }}
-          milestone={milestoneToSubmit}
+          isOpen={submitModalState.isOpen}
+          onClose={() =>
+            setSubmitModalState({ isOpen: false, milestone: null, index: -1 })
+          }
+          milestone={submitModalState.milestone}
           escrowId={escrow.id}
           onSubmit={handleSubmitWork}
-          isSubmitting={isSubmitPending || isSubmitConfirming}
+          isSubmitting={isSubmitPending || isSubmitConfirming || isSavingDb}
         />
       )}
     </div>
