@@ -43,6 +43,18 @@ const formSchema = z
   .object({
     projectTitle: z.string().min(1, "Project Title is required"),
     scopeOfWork: z.string().min(1, "Scope of work is required"),
+    dueDate: z
+      .string()
+      .optional()
+      .refine(
+        (val) => {
+          if (!val) return true; // Optional field
+          const inputDate = new Date(val);
+          const today = new Date(new Date().toISOString().split("T")[0]);
+          return inputDate >= today;
+        },
+        { message: "Due date cannot be in the past" },
+      ),
     useMilestones: z.boolean(),
     fundImmediately: z.boolean(),
     totalAmount: z.number({ error: "Must be a number" }).or(z.nan()).optional(),
@@ -126,6 +138,7 @@ export default function NewEscrowPage() {
     defaultValues: {
       projectTitle: "",
       scopeOfWork: "",
+      dueDate: "",
       useMilestones: false,
       fundImmediately: false,
       totalAmount: 0,
@@ -193,11 +206,14 @@ export default function NewEscrowPage() {
               },
             ];
 
+      const dueDate = data.dueDate ? new Date(data.dueDate) : undefined;
+
       const dbRes = await createDbMutation.mutateAsync({
         freelancerAddress: address,
         projectTitle: data.projectTitle,
         scopeOfWork: data.scopeOfWork,
         totalAmount: totalAmount,
+        dueDate,
         milestones: contractMilestones,
       });
 
@@ -212,6 +228,7 @@ export default function NewEscrowPage() {
     resetForm({
       projectTitle: "",
       scopeOfWork: "",
+      dueDate: "",
       useMilestones: false,
       fundImmediately: false,
       totalAmount: 0,
@@ -242,9 +259,9 @@ export default function NewEscrowPage() {
 
   if (generatedLink) {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="rounded-xl border border-border bg-secondary p-8 text-center">
-          <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-accent/20">
+      <div className="max-w-2xl mx-auto">
+        <div className="p-8 text-center border rounded-xl border-border bg-secondary">
+          <div className="flex items-center justify-center mx-auto mb-6 rounded-full size-16 bg-accent/20">
             <Check className="size-8 text-accent" />
           </div>
 
@@ -255,14 +272,14 @@ export default function NewEscrowPage() {
             Share this secure payment link with your client to collect funds.
           </p>
 
-          <div className="mt-6 rounded-lg border border-border bg-background p-4">
+          <div className="p-4 mt-6 border rounded-lg border-border bg-background">
             <div className="flex items-center gap-2">
-              <span className="flex-1 rounded bg-secondary px-3 py-2 text-sm text-primary break-all">
+              <span className="flex-1 px-3 py-2 text-sm break-all rounded bg-secondary text-primary">
                 {generatedLink}
               </span>
               <Button
                 onClick={handleCopyLink}
-                className="bg-primary/80 hover:bg-primary text-white shrink-0"
+                className="text-white bg-primary/80 hover:bg-primary shrink-0"
               >
                 {copied ? (
                   <Check className="size-4" />
@@ -273,7 +290,7 @@ export default function NewEscrowPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg border border-border bg-background p-4">
+          <div className="p-4 mt-6 border rounded-lg border-border bg-background">
             <div className="grid grid-cols-2 gap-4 text-left">
               <div>
                 <p className="text-sm text-secondary-foreground">
@@ -290,7 +307,7 @@ export default function NewEscrowPage() {
                 </p>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-border">
+            <div className="pt-3 mt-4 border-t border-border">
               <p className="text-xs text-secondary-foreground">
                 Your client will pay with USDC on{" "}
                 {chainConfig?.name || "Polygon"}. Once funded, the escrow will
@@ -299,7 +316,7 @@ export default function NewEscrowPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex gap-4">
+          <div className="flex gap-4 mt-8">
             <Link href="/escrows" className="flex-1">
               <Button
                 variant="outline"
@@ -310,7 +327,7 @@ export default function NewEscrowPage() {
             </Link>
             <Button
               onClick={handleCreateAnother}
-              className="flex-1 bg-primary/80 hover:bg-primary text-white"
+              className="flex-1 text-white bg-primary/80 hover:bg-primary"
             >
               Create Another
             </Button>
@@ -321,12 +338,12 @@ export default function NewEscrowPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <Link
           href="/escrows"
-          className="inline-flex items-center text-sm text-secondary-foreground hover:text-white mb-4"
+          className="inline-flex items-center mb-4 text-sm text-secondary-foreground hover:text-white"
         >
           <ArrowLeft className="mr-2 size-4" />
           Back to Escrows
@@ -340,7 +357,7 @@ export default function NewEscrowPage() {
       </div>
 
       {!isConnected && (
-        <div className="mb-6 rounded-xl border border-tb-warning/30 bg-tb-warning/10 p-4">
+        <div className="p-4 mb-6 border rounded-xl border-tb-warning/30 bg-tb-warning/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Wallet className="size-5 text-tb-warning" />
@@ -352,7 +369,7 @@ export default function NewEscrowPage() {
               onClick={connect}
               disabled={isConnecting}
               size="sm"
-              className="bg-tb-warning/80 hover:bg-tb-warning text-black"
+              className="text-black bg-tb-warning/80 hover:bg-tb-warning"
             >
               {isConnecting ? "Connecting..." : "Connect"}
             </Button>
@@ -361,7 +378,7 @@ export default function NewEscrowPage() {
       )}
 
       {isConnected && !isCorrectNetwork && (
-        <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+        <div className="p-4 mb-6 border rounded-xl border-destructive/30 bg-destructive/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <AlertCircle className="size-5 text-destructive" />
@@ -372,7 +389,7 @@ export default function NewEscrowPage() {
             <Button
               onClick={switchToCorrectNetwork}
               size="sm"
-              className="bg-destructive/80 hover:bg-destructive text-white"
+              className="text-white bg-destructive/80 hover:bg-destructive"
             >
               Switch Network
             </Button>
@@ -382,8 +399,8 @@ export default function NewEscrowPage() {
 
       <form onSubmit={(e) => handleSubmit(onSubmit)(e)} className="space-y-8">
         {/* Project Details */}
-        <div className="rounded-xl border border-border bg-secondary p-6">
-          <h2 className="text-lg font-medium text-white mb-4">
+        <div className="p-6 border rounded-xl border-border bg-secondary">
+          <h2 className="mb-4 text-lg font-medium text-white">
             Project Details
           </h2>
 
@@ -429,11 +446,33 @@ export default function NewEscrowPage() {
                 </p>
               )}
             </div>
+
+            <div>
+              <Label htmlFor="dueDate" className="text-secondary-foreground">
+                Project Due Date
+              </Label>
+              <Input
+                id="dueDate"
+                type="date"
+                {...register("dueDate")}
+                className="mt-1.5 border-border bg-background text-white"
+                disabled={!isConnected || isSubmitting}
+              />
+              <p className="mt-1 text-xs text-secondary-foreground">
+                When do you expect the project to be completed? This helps set
+                client expectations.
+              </p>
+              {errors.dueDate && (
+                <p className="mt-1 text-sm text-destructive">
+                  {errors.dueDate.message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Payment Structure */}
-        <div className="rounded-xl border border-border bg-secondary p-6">
+        <div className="p-6 border rounded-xl border-border bg-secondary">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-white">
               Payment Structure
@@ -464,7 +503,7 @@ export default function NewEscrowPage() {
               {milestoneFields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="rounded-lg border border-border bg-background p-4"
+                  className="p-4 border rounded-lg border-border bg-background"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium text-secondary-foreground">
@@ -477,7 +516,7 @@ export default function NewEscrowPage() {
                         size="sm"
                         onClick={() => removeMilestone(index)}
                         disabled={isSubmitting}
-                        className="size-8 p-0 text-red-400 hover:text-red-500 hover:bg-red-400/10"
+                        className="p-0 text-red-400 size-8 hover:text-red-500 hover:bg-red-400/10"
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -488,11 +527,11 @@ export default function NewEscrowPage() {
                       <Input
                         placeholder="Milestone title"
                         {...register(`milestones.${index}.title` as const)}
-                        className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
+                        className="text-white border-border bg-secondary placeholder:text-secondary-foreground/50"
                         disabled={!isConnected || isSubmitting}
                       />
                       {errors.milestones?.[index]?.title && (
-                        <p className="text-xs text-destructive mt-1">
+                        <p className="mt-1 text-xs text-destructive">
                           {errors.milestones[index]?.title?.message}
                         </p>
                       )}
@@ -504,7 +543,7 @@ export default function NewEscrowPage() {
                         {...register(`milestones.${index}.amount` as const, {
                           valueAsNumber: true,
                         })}
-                        className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
+                        className="text-white border-border bg-secondary placeholder:text-secondary-foreground/50"
                         step="0.01"
                         disabled={!isConnected || isSubmitting}
                       />
@@ -514,7 +553,7 @@ export default function NewEscrowPage() {
                     <Input
                       placeholder="Description (optional)"
                       {...register(`milestones.${index}.description` as const)}
-                      className="border-border bg-secondary text-white placeholder:text-secondary-foreground/50"
+                      className="text-white border-border bg-secondary placeholder:text-secondary-foreground/50"
                       disabled={!isConnected || isSubmitting}
                     />
                   </div>
@@ -561,8 +600,8 @@ export default function NewEscrowPage() {
 
         {/* Summary Footer */}
         {totalAmount > 0 && (
-          <div className="rounded-xl border border-border bg-secondary p-6">
-            <h2 className="text-lg font-medium text-white mb-4">Summary</h2>
+          <div className="p-6 border rounded-xl border-border bg-secondary">
+            <h2 className="mb-4 text-lg font-medium text-white">Summary</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-secondary-foreground">Total Amount</span>
@@ -578,7 +617,7 @@ export default function NewEscrowPage() {
                   -{formatUSDC(protocolFee)}
                 </span>
               </div>
-              <div className="border-t border-border pt-3">
+              <div className="pt-3 border-t border-border">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-white">You Receive</span>
                   <span className="text-lg font-semibold text-accent">
@@ -609,7 +648,7 @@ export default function NewEscrowPage() {
               !isCorrectNetwork ||
               totalAmount <= 0
             }
-            className="flex-1 bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+            className="flex-1 text-white bg-primary/80 hover:bg-primary disabled:opacity-50"
           >
             {isSubmitting ? "Generating Link..." : "Generate Payment Link"}
           </Button>

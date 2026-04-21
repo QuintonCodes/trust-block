@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       freelancerAddress,
       projectTitle,
       scopeOfWork,
+      dueDate,
       totalAmount,
       milestones,
     } = body;
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
         projectTitle,
         scopeOfWork: scopeOfWork || "Standard Development Services",
         totalAmount,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
         currency: "USDC",
         status: "DRAFT",
         milestones: {

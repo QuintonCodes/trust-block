@@ -70,6 +70,7 @@ model EscrowLink {
   currency          String       @default("USDC")
   status            EscrowStatus @default(DRAFT)
   contractAddress   String?      @map("contract_address")
+  dueDate           DateTime?    @map("due_date")
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
 

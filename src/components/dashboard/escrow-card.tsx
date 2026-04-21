@@ -53,7 +53,7 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
   }
 
   return (
-    <div className="group rounded-xl border border-border bg-secondary p-5 transition-colors hover:border-primary/50">
+    <div className="p-5 transition-colors border group rounded-xl border-border bg-secondary hover:border-primary/50">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -95,7 +95,7 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
       )}
 
       {/* Footer */}
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+      <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
         <p className="text-xs text-secondary-foreground">
           Created {formatDate(escrow.createdAt)}
         </p>
@@ -118,17 +118,18 @@ export function EscrowCard({ escrow }: { escrow: EscrowLink }) {
             </Button>
           )}
 
-          {escrow.status === "AWAITING_FUNDS" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopyLink}
-              className="h-8 text-secondary-foreground hover:text-white hover:bg-border"
-            >
-              <Copy className="mr-1.5 size-3.5" />
-              Copy Link
-            </Button>
-          )}
+          {escrow.status === "AWAITING_FUNDS" ||
+            (escrow.status === "DRAFT" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyLink}
+                className="h-8 text-secondary-foreground hover:text-white hover:bg-border"
+              >
+                <Copy className="mr-1.5 size-3.5" />
+                Copy Link
+              </Button>
+            ))}
 
           {escrow.contractAddress && (
             <Button

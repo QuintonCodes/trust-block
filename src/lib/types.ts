@@ -23,6 +23,8 @@ export type TransactionType =
   | "FEE_COLLECTION"
   | "REFUND";
 
+export type SubmissionType = "LINK" | "FILE";
+
 export interface User {
   walletAddress: string;
   displayName: string | null;
@@ -43,6 +45,7 @@ export interface EscrowLink {
   currency: string;
   status: EscrowStatus;
   contractAddress: string | null;
+  dueDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
   milestones?: Milestone[];
@@ -60,6 +63,8 @@ export interface Milestone {
   dueDate: Date | null;
   submittedAt: Date | null;
   autoReleaseAt: Date | null;
+  submissionType: SubmissionType | null;
+  submissionUrl: string | null;
 }
 
 export interface Transaction {
@@ -79,6 +84,7 @@ export interface CreateEscrowInput {
   scopeOfWork: string;
   totalAmount: number;
   currency?: string;
+  dueDate?: Date;
   milestones: CreateMilestoneInput[];
 }
 
