@@ -23,9 +23,11 @@ import { SubmitWorkModal } from "@/components/escrow/submit-work-modal";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useApproveMilestoneDb } from "@/lib/api/hooks/use-escrows-mutations";
 import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
 import { useSubmitWorkMutation } from "@/lib/api/hooks/use-submit-work";
 import { Milestone } from "@/lib/types";
+import { getCleanErrorMessage } from "@/lib/utils";
 import {
   useApproveMilestone,
   useAutoReleaseMilestone,
@@ -60,6 +62,8 @@ export default function EscrowDetailPage({
 
   const { mutateAsync: saveSubmissionToDb, isPending: isSavingDb } =
     useSubmitWorkMutation();
+
+  const { mutateAsync: approveMilestoneDb } = useApproveMilestoneDb();
 
   // Wagmi hooks
   const {
@@ -137,17 +141,35 @@ export default function EscrowDetailPage({
 
   // Handle side effects for confirmations and errors
   useEffect(() => {
-    if (isApproveConfirmed || isSubmitConfirmed || isAutoReleaseConfirmed) {
+    const handleConfirmation = async () => {
+      // If it's an approval, execute the database patch before fetching new data
+      if (
+        isApproveConfirmed &&
+        selectedMilestone !== null &&
+        escrow?.milestones
+      ) {
+        try {
+          const milestoneId = escrow.milestones[selectedMilestone].id;
+          await approveMilestoneDb({
+            escrowId: escrow.id,
+            milestoneId: milestoneId,
+          });
+        } catch (error) {
+          console.error("Failed to update database for approval:", error);
+          toast.error("Smart contract succeeded, but database update failed.");
+        }
+      }
+
       toast.success("Transaction confirmed!");
       refetchEscrow();
       setTimeout(() => setSelectedMilestone(null), 1000);
+    };
+
+    if (isApproveConfirmed || isSubmitConfirmed || isAutoReleaseConfirmed) {
+      handleConfirmation();
     }
-  }, [
-    isApproveConfirmed,
-    isSubmitConfirmed,
-    isAutoReleaseConfirmed,
-    refetchEscrow,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isApproveConfirmed, isSubmitConfirmed, isAutoReleaseConfirmed]);
 
   // Calculate overall project due date countdown
   useEffect(() => {
@@ -877,8 +899,9 @@ export default function EscrowDetailPage({
                       Transaction Failed
                     </p>
                     <p className="mt-1 text-sm text-secondary-foreground">
-                      {(approveError || submitError || autoReleaseError)
-                        ?.message || "Please try again."}
+                      {getCleanErrorMessage(
+                        approveError || submitError || autoReleaseError,
+                      )}
                     </p>
                   </div>
                 </div>

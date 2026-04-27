@@ -20,6 +20,7 @@ import {
   useUpdateEscrowDb,
 } from "@/lib/api/hooks/use-escrows-mutations";
 import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
+import { getCleanErrorMessage } from "@/lib/utils";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import {
   parseUSDC,
@@ -42,31 +43,6 @@ import {
 } from "@/lib/web3/wallet-context";
 
 type PaymentStep = "connect" | "create" | "approve" | "deposit" | "complete";
-
-interface Web3Error {
-  shortMessage?: string;
-  message?: string;
-}
-
-function getCleanErrorMessage(error: Web3Error | null | undefined): string {
-  if (!error) return "";
-
-  // Viem sometimes provides a shortMessage which is cleaner
-  const msgText = (error.shortMessage || error.message || "").toLowerCase();
-
-  if (msgText.includes("user rejected") || msgText.includes("user denied")) {
-    return "Transaction was cancelled.";
-  }
-  if (msgText.includes("insufficient funds")) {
-    return "You do not have enough funds to cover this transaction and gas fees.";
-  }
-  if (msgText.includes("unrecognized-selector")) {
-    return "Contract error: Function not found. Check if the correct contract is deployed.";
-  }
-
-  // Fallback to viem's short message, or a generic error if neither exists
-  return error.shortMessage || "Transaction failed. Please try again.";
-}
 
 export default function PaymentPage({
   params,
@@ -307,7 +283,7 @@ export default function PaymentPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="flex items-center justify-center min-h-screen p-4 bg-background">
         <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     );
@@ -315,9 +291,9 @@ export default function PaymentPage({
 
   if (isError || !escrow) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <div className="rounded-full bg-destructive/20 p-4 w-fit mx-auto mb-6">
+      <div className="flex items-center justify-center min-h-screen p-4 bg-background">
+        <div className="w-full max-w-md text-center">
+          <div className="p-4 mx-auto mb-6 rounded-full bg-destructive/20 w-fit">
             <AlertCircle className="size-8 text-destructive" />
           </div>
           <h1 className="text-2xl font-semibold text-white">
@@ -333,9 +309,9 @@ export default function PaymentPage({
 
   if (isSelfFunding) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center space-y-4">
-          <div className="rounded-full bg-destructive/20 p-4 w-fit mx-auto mb-6">
+      <div className="flex items-center justify-center min-h-screen p-4 bg-background">
+        <div className="w-full max-w-md space-y-4 text-center">
+          <div className="p-4 mx-auto mb-6 rounded-full bg-destructive/20 w-fit">
             <Shield className="size-8 text-destructive" />
           </div>
           <h1 className="text-2xl font-semibold text-white">
@@ -361,10 +337,10 @@ export default function PaymentPage({
   // Success state
   if (currentStep === "complete") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="rounded-xl border border-border bg-secondary p-8 text-center">
-            <div className="rounded-full bg-accent/20 p-4 w-fit mx-auto mb-6">
+      <div className="flex items-center justify-center min-h-screen p-4 bg-background">
+        <div className="w-full max-w-md">
+          <div className="p-8 text-center border rounded-xl border-border bg-secondary">
+            <div className="p-4 mx-auto mb-6 rounded-full bg-accent/20 w-fit">
               <Check className="size-8 text-accent" />
             </div>
             <h1 className="text-2xl font-semibold text-white">
@@ -374,7 +350,7 @@ export default function PaymentPage({
               Your funds are now secured in the smart contract escrow.
             </p>
 
-            <div className="mt-6 p-4 rounded-lg border border-border bg-background">
+            <div className="p-4 mt-6 border rounded-lg border-border bg-background">
               <div className="flex items-center justify-between">
                 <span className="text-secondary-foreground">
                   Amount Deposited
@@ -401,14 +377,14 @@ export default function PaymentPage({
               </div>
             )}
 
-            <div className="mt-6 p-4 rounded-lg border border-accent/30 bg-accent/5">
+            <div className="p-4 mt-6 border rounded-lg border-accent/30 bg-accent/5">
               <div className="flex items-start gap-3">
                 <Lock className="size-5 text-accent shrink-0 mt-0.5" />
                 <div className="text-left">
                   <p className="text-sm font-medium text-accent">
                     Funds Secured
                   </p>
-                  <p className="text-sm text-secondary-foreground mt-1">
+                  <p className="mt-1 text-sm text-secondary-foreground">
                     Your funds are locked in the escrow contract. They will be
                     released to the worker upon your approval of the completed
                     work, or automatically after 3 days if no action is taken.
@@ -426,7 +402,7 @@ export default function PaymentPage({
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-secondary">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="flex items-center justify-between px-4 py-4 mx-auto max-w-7xl">
           <div className="flex items-center gap-2">
             <Link href="/">
               <Image
@@ -434,7 +410,7 @@ export default function PaymentPage({
                 alt="TrustBlock Logo"
                 width={200}
                 height={40}
-                className="h-auto w-auto object-contain"
+                className="object-contain w-auto h-auto"
                 priority
               />
             </Link>
@@ -446,7 +422,7 @@ export default function PaymentPage({
                 <Button
                   onClick={switchToCorrectNetwork}
                   size="sm"
-                  className="bg-tb-warning/80 hover:bg-tb-warning text-black"
+                  className="text-black bg-tb-warning/80 hover:bg-tb-warning"
                 >
                   Switch Network
                 </Button>
@@ -464,7 +440,7 @@ export default function PaymentPage({
             <Button
               onClick={connect}
               disabled={isConnecting}
-              className="bg-primary/80 hover:bg-primary text-white"
+              className="text-white bg-primary/80 hover:bg-primary"
             >
               <Wallet className="mr-2 size-4" />
               {isConnecting ? "Connecting..." : "Connect Wallet"}
@@ -474,10 +450,10 @@ export default function PaymentPage({
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="px-4 py-8 mx-auto max-w-7xl">
         <div className="grid gap-8 lg:grid-cols-5">
           {/* Project Details */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="space-y-6 lg:col-span-3">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <StatusBadge status={escrow.status} />
@@ -494,29 +470,29 @@ export default function PaymentPage({
             </div>
 
             {/* Scope of Work */}
-            <div className="rounded-xl border border-border bg-secondary p-6">
-              <h2 className="text-lg font-medium text-white mb-3">
+            <div className="p-6 border rounded-xl border-border bg-secondary">
+              <h2 className="mb-3 text-lg font-medium text-white">
                 Scope of Work
               </h2>
-              <p className="text-secondary-foreground whitespace-pre-wrap">
+              <p className="whitespace-pre-wrap text-secondary-foreground">
                 {escrow.scopeOfWork}
               </p>
             </div>
 
             {/* Milestones */}
             {escrow.milestones && escrow.milestones.length > 0 && (
-              <div className="rounded-xl border border-border bg-secondary p-6">
-                <h2 className="text-lg font-medium text-white mb-4">
+              <div className="p-6 border rounded-xl border-border bg-secondary">
+                <h2 className="mb-4 text-lg font-medium text-white">
                   Payment Milestones
                 </h2>
                 <div className="space-y-3">
                   {escrow.milestones.map((milestone, index) => (
                     <div
                       key={milestone.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background p-4"
+                      className="flex items-center justify-between p-4 border rounded-lg border-border bg-background"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex size-6 items-center justify-center rounded-full border border-border text-xs text-secondary-foreground">
+                        <div className="flex items-center justify-center text-xs border rounded-full size-6 border-border text-secondary-foreground">
                           {index + 1}
                         </div>
                         <div>
@@ -540,9 +516,9 @@ export default function PaymentPage({
             )}
 
             {/* Security Info */}
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-6">
+            <div className="p-6 border rounded-xl border-primary/30 bg-primary/5">
               <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-primary/20 p-2">
+                <div className="p-2 rounded-lg bg-primary/20">
                   <Shield className="size-5 text-primary" />
                 </div>
                 <div>
@@ -564,12 +540,12 @@ export default function PaymentPage({
 
           {/* Payment Card */}
           <div className="lg:col-span-2">
-            <div className="sticky top-8 rounded-xl border border-border bg-secondary p-6">
-              <h2 className="text-lg font-medium text-white mb-4">
+            <div className="sticky p-6 border top-8 rounded-xl border-border bg-secondary">
+              <h2 className="mb-4 text-lg font-medium text-white">
                 Payment Summary
               </h2>
 
-              <div className="space-y-3 mb-6">
+              <div className="mb-6 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-secondary-foreground">Amount</span>
                   <span className="font-semibold text-white">
@@ -605,7 +581,7 @@ export default function PaymentPage({
                 )}
               </div>
 
-              <div className="border-t border-border pt-4 mb-6">
+              <div className="pt-4 mb-6 border-t border-border">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-white">
                     Total to Deposit
@@ -617,7 +593,7 @@ export default function PaymentPage({
               </div>
 
               {/* Payment Steps */}
-              <div className="space-y-3 mb-6">
+              <div className="mb-6 space-y-3">
                 {/* Step 1 */}
                 <div
                   className={`rounded-lg border p-3 ${getStepStatus("connect") === "complete" ? "border-accent/30 bg-accent/5" : getStepStatus("connect") === "current" ? "border-primary bg-primary/5" : "border-border bg-background"}`}
@@ -626,7 +602,7 @@ export default function PaymentPage({
                     {getStepStatus("connect") === "complete" ? (
                       <Check className="size-5 text-accent" />
                     ) : (
-                      <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
+                      <div className="flex items-center justify-center text-xs border border-current rounded-full size-5">
                         1
                       </div>
                     )}
@@ -650,7 +626,7 @@ export default function PaymentPage({
                     {getStepStatus("create") === "complete" ? (
                       <Check className="size-5 text-accent" />
                     ) : (
-                      <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
+                      <div className="flex items-center justify-center text-xs border border-current rounded-full size-5">
                         2
                       </div>
                     )}
@@ -665,7 +641,7 @@ export default function PaymentPage({
                     </span>
                   </div>
                   {currentStep === "create" && createStatus !== "idle" && (
-                    <p className="mt-2 text-xs text-secondary-foreground ml-8">
+                    <p className="mt-2 ml-8 text-xs text-secondary-foreground">
                       {getTransactionStatusMessage(createStatus)}
                     </p>
                   )}
@@ -674,7 +650,7 @@ export default function PaymentPage({
                       href={getExplorerTxUrl(createHash, PRIMARY_CHAIN_ID)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 ml-8 inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary"
+                      className="inline-flex items-center gap-1 mt-1 ml-8 text-xs text-primary/80 hover:text-primary"
                     >
                       View on explorer <ExternalLink className="size-3" />
                     </a>
@@ -689,7 +665,7 @@ export default function PaymentPage({
                     {getStepStatus("approve") === "complete" ? (
                       <Check className="size-5 text-accent" />
                     ) : (
-                      <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
+                      <div className="flex items-center justify-center text-xs border border-current rounded-full size-5">
                         3
                       </div>
                     )}
@@ -704,7 +680,7 @@ export default function PaymentPage({
                     </span>
                   </div>
                   {currentStep === "approve" && approvalStatus !== "idle" && (
-                    <p className="mt-2 text-xs text-secondary-foreground ml-8">
+                    <p className="mt-2 ml-8 text-xs text-secondary-foreground">
                       {getTransactionStatusMessage(approvalStatus)}
                     </p>
                   )}
@@ -713,7 +689,7 @@ export default function PaymentPage({
                       href={getExplorerTxUrl(approvalHash, PRIMARY_CHAIN_ID)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 ml-8 inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary"
+                      className="inline-flex items-center gap-1 mt-1 ml-8 text-xs text-primary/80 hover:text-primary"
                     >
                       View on explorer <ExternalLink className="size-3" />
                     </a>
@@ -728,7 +704,7 @@ export default function PaymentPage({
                     {getStepStatus("deposit") === "complete" ? (
                       <Check className="size-5 text-accent" />
                     ) : (
-                      <div className="flex size-5 items-center justify-center rounded-full border border-current text-xs">
+                      <div className="flex items-center justify-center text-xs border border-current rounded-full size-5">
                         4
                       </div>
                     )}
@@ -743,7 +719,7 @@ export default function PaymentPage({
                     </span>
                   </div>
                   {currentStep === "deposit" && depositStatus !== "idle" && (
-                    <p className="mt-2 text-xs text-secondary-foreground ml-8">
+                    <p className="mt-2 ml-8 text-xs text-secondary-foreground">
                       {getTransactionStatusMessage(depositStatus)}
                     </p>
                   )}
@@ -752,7 +728,7 @@ export default function PaymentPage({
                       href={getExplorerTxUrl(depositHash, PRIMARY_CHAIN_ID)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 ml-8 inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary"
+                      className="inline-flex items-center gap-1 mt-1 ml-8 text-xs text-primary/80 hover:text-primary"
                     >
                       View on explorer <ExternalLink className="size-3" />
                     </a>
@@ -765,7 +741,7 @@ export default function PaymentPage({
                 <Button
                   onClick={connect}
                   disabled={isConnecting}
-                  className="w-full bg-primary/80 hover:bg-primary text-white"
+                  className="w-full text-white bg-primary/80 hover:bg-primary"
                 >
                   {isConnecting ? (
                     <>
@@ -782,7 +758,7 @@ export default function PaymentPage({
               ) : !isCorrectNetwork ? (
                 <Button
                   onClick={switchToCorrectNetwork}
-                  className="w-full bg-tb-warning/80 hover:bg-tb-warning text-black"
+                  className="w-full text-black bg-tb-warning/80 hover:bg-tb-warning"
                 >
                   <AlertCircle className="mr-2 size-4" />
                   Switch to{" "}
@@ -795,7 +771,7 @@ export default function PaymentPage({
                   disabled={
                     isCheckingOnChain || isCreatePending || isCreateConfirming
                   }
-                  className="w-full bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+                  className="w-full text-white bg-primary/80 hover:bg-primary disabled:opacity-50"
                 >
                   {isCheckingOnChain ? (
                     <>
@@ -832,7 +808,7 @@ export default function PaymentPage({
                     isApprovalConfirming ||
                     usdcAllowance === undefined
                   }
-                  className="w-full bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+                  className="w-full text-white bg-primary/80 hover:bg-primary disabled:opacity-50"
                 >
                   {usdcAllowance === undefined ? (
                     <>
@@ -865,7 +841,7 @@ export default function PaymentPage({
                 <Button
                   onClick={handleDeposit}
                   disabled={isDepositPending || isDepositConfirming}
-                  className="w-full bg-accent/80 hover:bg-accent text-white disabled:opacity-50"
+                  className="w-full text-white bg-accent/80 hover:bg-accent disabled:opacity-50"
                 >
                   {isDepositPending ? (
                     <>
@@ -893,7 +869,7 @@ export default function PaymentPage({
 
               {/* Error Display */}
               {(createError || approvalError || depositError) && (
-                <div className="mt-4 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                <div className="p-3 mt-4 border rounded-lg border-destructive/30 bg-destructive/5">
                   <p className="text-sm text-destructive">
                     {getCleanErrorMessage(
                       createError || approvalError || depositError,
@@ -902,7 +878,7 @@ export default function PaymentPage({
                 </div>
               )}
 
-              <p className="mt-4 text-center text-xs text-secondary-foreground">
+              <p className="mt-4 text-xs text-center text-secondary-foreground">
                 By depositing, you agree to TrustBlock&apos;s terms of service
               </p>
             </div>

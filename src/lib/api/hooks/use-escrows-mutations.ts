@@ -68,3 +68,23 @@ export function useRecordDepositDb() {
     },
   });
 }
+
+export function useApproveMilestoneDb() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { escrowId: string; milestoneId: string }) => {
+      const response = await axios.patch(
+        `/api/escrows/${data.escrowId}/milestones/${data.milestoneId}/approve`,
+      );
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["escrow", variables.escrowId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["escrows"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
