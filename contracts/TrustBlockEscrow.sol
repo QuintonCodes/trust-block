@@ -133,10 +133,12 @@ contract TrustBlockEscrow is ReentrancyGuard, Ownable {
     function approveMilestone(bytes32 escrowId, uint256 milestoneIndex) external nonReentrant {
         Escrow storage escrow = escrows[escrowId];
         require(msg.sender == escrow.client, "Only client can approve");
-        require(escrow.status == EscrowStatus.IN_REVIEW, "Escrow not in review");
+
+        require(escrow.status == EscrowStatus.IN_REVIEW || escrow.status == EscrowStatus.LOCKED, "Escrow not active");
 
         Milestone storage milestone = escrowMilestones[escrowId][milestoneIndex];
-        require(milestone.status == MilestoneStatus.WORK_SUBMITTED, "Milestone not submitted");
+
+        require(milestone.status == MilestoneStatus.WORK_SUBMITTED || milestone.status == MilestoneStatus.FUNDED, "Milestone not ready for approval");
 
         _processPayment(escrowId, milestoneIndex, escrow, milestone, MilestoneStatus.APPROVED_AND_PAID);
     }

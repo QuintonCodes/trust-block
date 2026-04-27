@@ -175,13 +175,16 @@ export function SubmitWorkModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-lg bg-secondary border-border">
-        <form onSubmit={handleSubmit(onSubmitForm)}>
-          <DialogHeader>
-            <DialogTitle className="text-white">
+      <DialogContent className="sm:max-w-lg bg-secondary border-border w-full overflow-hidden">
+        <form
+          onSubmit={handleSubmit(onSubmitForm)}
+          className="w-full overflow-hidden"
+        >
+          <DialogHeader className="w-full overflow-hidden">
+            <DialogTitle className="text-white truncate">
               Submit Work for Review
             </DialogTitle>
-            <DialogDescription className="text-secondary-foreground">
+            <DialogDescription className="text-secondary-foreground break-all whitespace-normal">
               Submit your completed work for &quot;{milestone.title}&quot; to
               request client approval and release of funds.
             </DialogDescription>
@@ -198,7 +201,7 @@ export function SubmitWorkModal({
                   onClick={() => setValue("submissionType", "link")}
                   className="flex items-center gap-4 p-4 text-left transition-colors border rounded-lg border-border bg-background hover:border-primary hover:bg-primary/5"
                 >
-                  <div className="flex items-center justify-center rounded-lg size-12 bg-primary/20">
+                  <div className="flex items-center justify-center rounded-lg size-12 bg-primary/20 shrink-0">
                     <LinkIcon className="size-6 text-primary" />
                   </div>
                   <div>
@@ -214,7 +217,7 @@ export function SubmitWorkModal({
                   onClick={() => setValue("submissionType", "file")}
                   className="flex items-center gap-4 p-4 text-left transition-colors border rounded-lg border-border bg-background hover:border-primary hover:bg-primary/5"
                 >
-                  <div className="flex items-center justify-center rounded-lg size-12 bg-accent/20">
+                  <div className="flex items-center justify-center rounded-lg size-12 bg-accent/20 shrink-0">
                     <FileArchive className="size-6 text-accent" />
                   </div>
                   <div>
@@ -231,7 +234,7 @@ export function SubmitWorkModal({
 
           {/* Deployment Link Input */}
           {submissionType === "link" && (
-            <div className="py-4 space-y-4">
+            <div className="py-4 space-y-4 w-full">
               <button
                 onClick={() => setValue("submissionType", null)}
                 className="flex items-center gap-1 text-sm text-secondary-foreground hover:text-white"
@@ -239,7 +242,7 @@ export function SubmitWorkModal({
                 <X className="size-3" /> Change submission type
               </button>
 
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label
                   htmlFor="deploymentUrl"
                   className="text-secondary-foreground"
@@ -251,7 +254,7 @@ export function SubmitWorkModal({
                   type="url"
                   placeholder="https://your-project.vercel.app"
                   {...register("deploymentUrl")}
-                  className="text-white border-border bg-background placeholder:text-secondary-foreground/50"
+                  className="text-white border-border bg-background placeholder:text-secondary-foreground/50 w-full"
                 />
                 <p className="text-xs text-secondary-foreground">
                   Provide the live deployment URL where your client can review
@@ -270,7 +273,7 @@ export function SubmitWorkModal({
 
           {/* File Upload */}
           {submissionType === "file" && (
-            <div className="py-4 space-y-4">
+            <div className="py-4 space-y-4 w-full overflow-hidden">
               <button
                 onClick={() => setValue("submissionType", null)}
                 className="flex items-center gap-1 text-sm text-secondary-foreground hover:text-white"
@@ -282,10 +285,10 @@ export function SubmitWorkModal({
                 <>
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-8 text-center transition-colors border-2 border-dashed rounded-lg cursor-pointer border-border bg-background hover:border-primary hover:bg-primary/5"
+                    className="p-8 text-center transition-colors border-2 border-dashed rounded-lg cursor-pointer border-border bg-background hover:border-primary hover:bg-primary/5 w-full overflow-hidden"
                   >
                     <Upload className="mx-auto mb-3 size-10 text-secondary-foreground" />
-                    <p className="text-sm text-white">
+                    <p className="text-sm text-white truncate px-2">
                       {selectedFile
                         ? selectedFile.name
                         : "Click to select a ZIP file"}
@@ -304,22 +307,23 @@ export function SubmitWorkModal({
                   />
 
                   {selectedFile && !isUploading && (
-                    <div className="flex items-center justify-between p-3 border rounded-lg border-border bg-background">
-                      <div className="flex items-center gap-3">
-                        <FileArchive className="size-5 text-accent" />
-                        <div>
-                          <p className="text-sm text-white">
-                            {selectedFile.name}
-                          </p>
-                          <p className="text-xs text-secondary-foreground">
-                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                          </p>
-                        </div>
+                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-3 border rounded-lg border-border bg-background w-full overflow-hidden">
+                      <FileArchive className="size-5 text-accent shrink-0" />
+                      <div className="min-w-0 w-full overflow-hidden">
+                        <p
+                          className="text-sm text-white truncate w-full"
+                          title={selectedFile.name}
+                        >
+                          {selectedFile.name}
+                        </p>
+                        <p className="text-xs text-secondary-foreground">
+                          {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                        </p>
                       </div>
                       <Button
                         onClick={handleUploadFile}
                         size="sm"
-                        className="text-white bg-primary/80 hover:bg-primary"
+                        className="text-white shrink-0 bg-primary/80 hover:bg-primary"
                       >
                         Upload
                       </Button>
@@ -342,15 +346,15 @@ export function SubmitWorkModal({
                   )}
                 </>
               ) : (
-                <div className="p-4 border rounded-lg border-accent/30 bg-accent/10">
-                  <div className="flex items-center gap-3 overflow-hidden">
+                <div className="p-4 border rounded-lg border-accent/30 bg-accent/10 w-full overflow-hidden">
+                  <div className="grid grid-cols-[auto_1fr] items-center w-full gap-3">
                     <CheckCircle2 className="size-5 text-accent shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white">
+                    <div className="w-full min-w-0 overflow-hidden">
+                      <p className="text-sm font-medium text-white truncate">
                         File uploaded successfully
                       </p>
                       <p
-                        className="mt-1 text-xs truncate text-secondary-foreground"
+                        className="mt-1 text-xs text-secondary-foreground truncate w-full"
                         title={fileUrl}
                       >
                         {fileUrl}

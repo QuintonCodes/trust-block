@@ -125,7 +125,7 @@ export function useUSDCBalance(address: `0x${string}` | undefined) {
  */
 export function useCreateEscrow() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -148,7 +148,7 @@ export function useCreateEscrow() {
     const titles = milestones.map((m) => m.title);
     const amounts = milestones.map((m) => parseUSDC(m.amount));
 
-    mutate({
+    await mutateAsync({
       address: ESCROW_CONTRACT_ADDRESS as `0x${string}`,
       args: [bytes32Id, freelancerAddress, parsedTotal, titles, amounts],
     });
@@ -170,7 +170,7 @@ export function useCreateEscrow() {
  */
 export function useApproveUSDC() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -190,7 +190,7 @@ export function useApproveUSDC() {
         PRIMARY_CHAIN_ID as keyof typeof USDC_CONTRACT_ADDRESS
       ];
 
-    mutate({
+    await mutateAsync({
       address: usdcAddress as `0x${string}`,
       args: [ESCROW_CONTRACT_ADDRESS, parseUSDC(amount)],
     });
@@ -212,7 +212,7 @@ export function useApproveUSDC() {
  */
 export function useDepositFunds() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -227,7 +227,7 @@ export function useDepositFunds() {
   });
 
   const deposit = async (escrowId: string, amount: number | string) => {
-    mutate({
+    await mutateAsync({
       address: ESCROW_CONTRACT_ADDRESS as `0x${string}`,
       args: [escrowIdToBytes32(escrowId), parseUSDC(amount)],
     });
@@ -249,7 +249,7 @@ export function useDepositFunds() {
  */
 export function useSubmitMilestone() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -264,7 +264,7 @@ export function useSubmitMilestone() {
   });
 
   const submit = async (escrowId: string, milestoneIndex: number) => {
-    mutate({
+    await mutateAsync({
       address: ESCROW_CONTRACT_ADDRESS as `0x${string}`,
       args: [escrowIdToBytes32(escrowId), BigInt(milestoneIndex)],
     });
@@ -286,7 +286,7 @@ export function useSubmitMilestone() {
  */
 export function useApproveMilestone() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -301,7 +301,7 @@ export function useApproveMilestone() {
   });
 
   const approve = async (escrowId: string, milestoneIndex: number) => {
-    mutate({
+    await mutateAsync({
       address: ESCROW_CONTRACT_ADDRESS as `0x${string}`,
       args: [escrowIdToBytes32(escrowId), BigInt(milestoneIndex)],
     });
@@ -323,7 +323,7 @@ export function useApproveMilestone() {
  */
 export function useAutoReleaseMilestone() {
   const {
-    mutate,
+    mutateAsync,
     data: hash,
     isPending,
     error,
@@ -338,7 +338,7 @@ export function useAutoReleaseMilestone() {
   });
 
   const autoRelease = async (escrowId: string, milestoneIndex: number) => {
-    mutate({
+    await mutateAsync({
       address: ESCROW_CONTRACT_ADDRESS as `0x${string}`,
       args: [escrowIdToBytes32(escrowId), BigInt(milestoneIndex)],
     });

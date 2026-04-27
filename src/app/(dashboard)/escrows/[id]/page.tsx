@@ -31,7 +31,6 @@ import { getCleanErrorMessage } from "@/lib/utils";
 import {
   useApproveMilestone,
   useAutoReleaseMilestone,
-  useSubmitMilestone,
 } from "@/lib/web3/hooks/use-escrow";
 import {
   copyToClipboard,
@@ -76,15 +75,6 @@ export default function EscrowDetailPage({
   } = useApproveMilestone();
 
   const {
-    submit: submitMilestone,
-    isPending: isSubmitPending,
-    isConfirming: isSubmitConfirming,
-    isConfirmed: isSubmitConfirmed,
-    error: submitError,
-    reset: resetSubmit,
-  } = useSubmitMilestone();
-
-  const {
     autoRelease,
     isPending: isAutoReleasePending,
     isConfirming: isAutoReleaseConfirming,
@@ -105,37 +95,25 @@ export default function EscrowDetailPage({
 
   // Derive action status from hook states
   const actionStatus = useMemo((): TransactionStatus => {
-    if (isApprovePending || isSubmitPending || isAutoReleasePending) {
+    if (isApprovePending || isAutoReleasePending) {
       return "awaiting-signature";
-    } else if (
-      isApproveConfirming ||
-      isSubmitConfirming ||
-      isAutoReleaseConfirming
-    ) {
+    } else if (isApproveConfirming || isAutoReleaseConfirming) {
       return "confirming";
-    } else if (
-      isApproveConfirmed ||
-      isSubmitConfirmed ||
-      isAutoReleaseConfirmed
-    ) {
+    } else if (isApproveConfirmed || isAutoReleaseConfirmed) {
       return "confirmed";
-    } else if (approveError || submitError || autoReleaseError) {
+    } else if (approveError || autoReleaseError) {
       return "error";
     } else {
       return "idle";
     }
   }, [
     isApprovePending,
-    isSubmitPending,
     isAutoReleasePending,
     isApproveConfirming,
-    isSubmitConfirming,
     isAutoReleaseConfirming,
     isApproveConfirmed,
-    isSubmitConfirmed,
     isAutoReleaseConfirmed,
     approveError,
-    submitError,
     autoReleaseError,
   ]);
 
@@ -165,11 +143,11 @@ export default function EscrowDetailPage({
       setTimeout(() => setSelectedMilestone(null), 1000);
     };
 
-    if (isApproveConfirmed || isSubmitConfirmed || isAutoReleaseConfirmed) {
+    if (isApproveConfirmed || isAutoReleaseConfirmed) {
       handleConfirmation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApproveConfirmed, isSubmitConfirmed, isAutoReleaseConfirmed]);
+  }, [isApproveConfirmed, isAutoReleaseConfirmed]);
 
   // Calculate overall project due date countdown
   useEffect(() => {
@@ -358,7 +336,6 @@ export default function EscrowDetailPage({
       return;
 
     setSelectedMilestone(submitModalState.index);
-    resetSubmit();
 
     try {
       await saveSubmissionToDb({
@@ -368,9 +345,9 @@ export default function EscrowDetailPage({
         submissionUrl: submissionData,
       });
 
-      await submitMilestone(escrow.id, submitModalState.index);
-
+      toast.success("Work submitted for review!");
       setSubmitModalState({ isOpen: false, milestone: null, index: -1 });
+      refetchEscrow();
     } catch (error) {
       console.error("Failed to submit work:", error);
       toast.error("Failed to save submission data. Please try again.");
@@ -890,7 +867,7 @@ export default function EscrowDetailPage({
             </div>
 
             {/* Error Display */}
-            {(approveError || submitError || autoReleaseError) && (
+            {(approveError || autoReleaseError) && (
               <div className="p-4 border rounded-xl border-destructive/30 bg-destructive/5">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="size-5 text-destructive shrink-0" />
@@ -899,9 +876,7 @@ export default function EscrowDetailPage({
                       Transaction Failed
                     </p>
                     <p className="mt-1 text-sm text-secondary-foreground">
-                      {getCleanErrorMessage(
-                        approveError || submitError || autoReleaseError,
-                      )}
+                      {getCleanErrorMessage(approveError || autoReleaseError)}
                     </p>
                   </div>
                 </div>
@@ -921,7 +896,7 @@ export default function EscrowDetailPage({
           milestone={submitModalState.milestone}
           escrowId={escrow.id}
           onSubmit={handleSubmitWork}
-          isSubmitting={isSubmitPending || isSubmitConfirming || isSavingDb}
+          isSubmitting={isSavingDb}
         />
       )}
     </div>

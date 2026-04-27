@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "chain": "npx hardhat node",
-    "setup:local": "npx hardhat ignition deploy ignition/modules/TrustBlock.ts --network localhost && npx hardhat run scripts/mint-usdc.ts --network localhost"
+    "setup:local": "npx hardhat ignition deploy ./ignition/modules/TrustBlock.ts --network localhost --parameters ./ignition/parameters.json && npx hardhat run scripts/mint-usdc.ts --network localhost",
+    "setup:live": "npx hardhat ignition deploy ./ignition/modules/TrustBlock.ts --network polygon --verify"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
