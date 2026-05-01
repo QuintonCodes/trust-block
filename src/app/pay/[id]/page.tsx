@@ -2,8 +2,10 @@
 
 import {
   AlertCircle,
+  ArrowRight,
   Check,
   ExternalLink,
+  Info,
   Loader2,
   Lock,
   Shield,
@@ -11,26 +13,14 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { use, useEffect, useMemo, useRef } from "react";
+import { use } from "react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  useRecordDepositDb,
-  useUpdateEscrowDb,
-} from "@/lib/api/hooks/use-escrows-mutations";
 import { useGetEscrow } from "@/lib/api/hooks/use-escrows-queries";
 import { getCleanErrorMessage } from "@/lib/utils";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
-import {
-  parseUSDC,
-  useApproveUSDC,
-  useCreateEscrow,
-  useDepositFunds,
-  useEscrowStatus,
-  useUSDCAllowance,
-  useUSDCBalance,
-} from "@/lib/web3/hooks/use-escrow";
+import { usePaymentLogic } from "@/lib/web3/hooks/use-payment-logic";
 import {
   formatDate,
   formatUSDC,
@@ -39,10 +29,9 @@ import {
 } from "@/lib/web3/utils";
 import {
   getTransactionStatusMessage,
+  TransactionStatus,
   useWallet,
 } from "@/lib/web3/wallet-context";
-
-type PaymentStep = "connect" | "create" | "approve" | "deposit" | "complete";
 
 export default function PaymentPage({
   params,
@@ -61,225 +50,37 @@ export default function PaymentPage({
   } = useWallet();
 
   const { data: escrow, isLoading, isError } = useGetEscrow(id);
-  const { mutate: recordDeposit } = useRecordDepositDb();
-  const { mutate: updateEscrow } = useUpdateEscrowDb();
-
-  const dbRecorded = useRef(false);
-  const createRecorded = useRef(false);
-
-  // 1. Blockchain Data Hooks
-  const { data: usdcBalance } = useUSDCBalance(address);
-  const { data: usdcAllowance } = useUSDCAllowance(address);
-  const { data: onChainEscrow, isLoading: isCheckingOnChain } = useEscrowStatus(
-    escrow?.id,
-  );
-
-  const isCreatedOnChain = useMemo(() => {
-    if (!onChainEscrow) return false;
-    return onChainEscrow[0] !== "0x0000000000000000000000000000000000000000";
-  }, [onChainEscrow]);
-
-  // 2. Write Hooks
-  const {
-    create: createEscrowContract,
-    hash: createHash,
-    isPending: isCreatePending,
-    isConfirming: isCreateConfirming,
-    isConfirmed: isCreateConfirmed,
-    error: createError,
-    reset: resetCreate,
-  } = useCreateEscrow();
 
   const {
-    approve: approveUSDC,
-    hash: approvalHash,
-    isPending: isApprovalPending,
-    isConfirming: isApprovalConfirming,
-    isConfirmed: isApprovalConfirmed,
-    error: approvalError,
-    reset: resetApproval,
-  } = useApproveUSDC();
-
-  const {
-    deposit: depositFunds,
-    hash: depositHash,
-    isPending: isDepositPending,
-    isConfirming: isDepositConfirming,
-    isConfirmed: isDepositConfirmed,
-    error: depositError,
-    reset: resetDeposit,
-  } = useDepositFunds();
-
-  useEffect(() => {
-    if (
-      (isCreateConfirmed || isCreatedOnChain) &&
-      escrow?.status === "DRAFT" &&
-      !createRecorded.current
-    ) {
-      createRecorded.current = true;
-
-      updateEscrow({
-        id: escrow.id,
-        status: "AWAITING_FUNDS",
-      });
-    }
-  }, [isCreateConfirmed, isCreatedOnChain, escrow, updateEscrow]);
-
-  const isSelfFunding = useMemo(() => {
-    return (
-      isConnected &&
-      address &&
-      escrow?.freelancerAddress?.toLowerCase() === address.toLowerCase()
-    );
-  }, [isConnected, address, escrow]);
-
-  const createStatus = useMemo(() => {
-    if (isCreatePending) return "awaiting-signature";
-    if (createHash && isCreateConfirming) return "confirming";
-    if (isCreateConfirmed || isCreatedOnChain) return "confirmed";
-    if (createError) return "error";
-    return "idle";
-  }, [
-    isCreatePending,
-    createHash,
-    isCreateConfirming,
-    isCreateConfirmed,
-    isCreatedOnChain,
-    createError,
-  ]);
-
-  const depositStatus = useMemo(() => {
-    if (isDepositPending) {
-      return "awaiting-signature";
-    } else if (depositHash && isDepositConfirming) {
-      return "confirming";
-    } else if (isDepositConfirmed) {
-      return "confirmed";
-    } else if (depositError) {
-      return "error";
-    }
-    return "idle";
-  }, [
-    isDepositPending,
-    depositHash,
-    isDepositConfirming,
-    isDepositConfirmed,
-    depositError,
-  ]);
-
-  const currentStep = useMemo(() => {
-    if (!isConnected) return "connect";
-    if (depositStatus === "confirmed" || isDepositConfirmed) return "complete";
-
-    if (escrow) {
-      if (!isCreatedOnChain && !isCreateConfirmed) {
-        return "create";
-      }
-
-      if (usdcAllowance === undefined) {
-        return "approve";
-      }
-
-      const requiredAmount = parseUSDC(escrow.totalAmount);
-      if (usdcAllowance >= requiredAmount || isApprovalConfirmed) {
-        return "deposit";
-      } else {
-        return "approve";
-      }
-    }
-    return "connect"; // Default fallback
-  }, [
-    isConnected,
-    isCreatedOnChain,
-    isCreateConfirmed,
+    usdcBalance,
     usdcAllowance,
-    escrow,
-    isApprovalConfirmed,
-    isDepositConfirmed,
+    isCheckingOnChain,
+    isSelfFunding,
+    createStatus,
     depositStatus,
-  ]);
-
-  const approvalStatus = useMemo(() => {
-    if (isApprovalPending) {
-      return "awaiting-signature";
-    } else if (approvalHash && isApprovalConfirming) {
-      return "confirming";
-    } else if (isApprovalConfirmed) {
-      return "confirmed";
-    } else if (approvalError) {
-      return "error";
-    }
-    return "idle";
-  }, [
-    isApprovalPending,
+    approvalStatus,
+    currentStep,
+    getStepStatus,
+    handleCreate,
+    handleApproveUSDC,
+    handleDeposit,
+    createHash,
     approvalHash,
-    isApprovalConfirming,
-    isApprovalConfirmed,
+    depositHash,
+    createError,
     approvalError,
-  ]);
-
-  useEffect(() => {
-    if (
-      isDepositConfirmed &&
-      depositHash &&
-      escrow &&
-      address &&
-      !dbRecorded.current
-    ) {
-      dbRecorded.current = true;
-      recordDeposit({
-        escrowLinkId: escrow.id,
-        txHash: depositHash,
-        fromAddress: address,
-        toAddress: escrow.contractAddress || escrow.freelancerAddress,
-        amount: Number(escrow.totalAmount),
-      });
-    }
-  }, [isDepositConfirmed, depositHash, escrow, address, recordDeposit]);
-
-  async function handleCreate() {
-    resetCreate();
-    const contractMilestones =
-      escrow?.milestones && escrow.milestones.length > 0
-        ? escrow.milestones.map((m) => ({
-            title: m.title,
-            amount: Number(m.amount),
-          }))
-        : [{ title: "Full Project", amount: Number(escrow?.totalAmount) }];
-
-    await createEscrowContract(
-      escrow?.id || "",
-      (escrow?.freelancerAddress as `0x${string}`) || "0x",
-      Number(escrow?.totalAmount || 0),
-      contractMilestones,
-    );
-  }
-
-  async function handleApproveUSDC() {
-    resetApproval();
-    await approveUSDC(escrow?.totalAmount || 0);
-  }
-
-  async function handleDeposit() {
-    resetDeposit();
-    await depositFunds(escrow?.id || "", escrow?.totalAmount || 0);
-  }
-
-  function getStepStatus(step: PaymentStep) {
-    const steps: PaymentStep[] = [
-      "connect",
-      "create",
-      "approve",
-      "deposit",
-      "complete",
-    ];
-    const currentIndex = steps.indexOf(currentStep);
-    const stepIndex = steps.indexOf(step);
-
-    if (stepIndex < currentIndex) return "complete";
-    if (stepIndex === currentIndex) return "current";
-    return "upcoming";
-  }
+    depositError,
+    isCreatePending,
+    isCreateConfirming,
+    isApprovalPending,
+    isApprovalConfirming,
+    isDepositPending,
+    isDepositConfirming,
+  } = usePaymentLogic(
+    escrow,
+    address as `0x${string}` | undefined,
+    isConnected,
+  );
 
   if (isLoading) {
     return (
@@ -307,6 +108,38 @@ export default function PaymentPage({
     );
   }
 
+  // Handle case where escrow is already funded / locked
+  const isEscrowAlreadyFunded =
+    escrow && !["DRAFT", "AWAITING_FUNDS"].includes(escrow.status);
+
+  if (isEscrowAlreadyFunded && currentStep !== "complete") {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-4 bg-background">
+        <div className="w-full max-w-md space-y-4 text-center">
+          <div className="p-4 mx-auto mb-6 rounded-full bg-accent/20 w-fit">
+            <Info className="size-8 text-accent" />
+          </div>
+          <h1 className="text-2xl font-semibold text-white">
+            Escrow Already Funded
+          </h1>
+          <p className="mt-2 text-secondary-foreground">
+            This escrow has already been successfully funded and is currently in{" "}
+            <span className="font-semibold text-white">{escrow.status}</span>{" "}
+            status.
+          </p>
+          <div className="pt-4">
+            <Link href={`/escrows/${escrow.id}`}>
+              <Button className="w-full text-white bg-primary/80 hover:bg-primary">
+                View Escrow Details
+                <ArrowRight className="ml-2 size-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isSelfFunding) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4 bg-background">
@@ -315,7 +148,7 @@ export default function PaymentPage({
             <Shield className="size-8 text-destructive" />
           </div>
           <h1 className="text-2xl font-semibold text-white">
-            Action Not Allowed
+            Action Not Allowed (Dev Mode)
           </h1>
           <p className="mt-2 text-secondary-foreground">
             You cannot fund your own escrow. Please ensure you are logged in
@@ -361,8 +194,14 @@ export default function PaymentPage({
               </div>
             </div>
 
-            {depositHash && (
-              <div className="mt-4">
+            <div className="flex flex-col gap-3 mt-6">
+              <Link href={`/escrows/${escrow.id}`}>
+                <Button className="w-full bg-primary/80 hover:bg-primary text-white">
+                  View Escrow Dashboard
+                </Button>
+              </Link>
+
+              {depositHash && (
                 <a
                   href={getExplorerTxUrl(depositHash, PRIMARY_CHAIN_ID)}
                   target="_blank"
@@ -374,8 +213,8 @@ export default function PaymentPage({
                     ?.name || "Explorer"}
                   <ExternalLink className="size-4" />
                 </a>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="p-4 mt-6 border rounded-lg border-accent/30 bg-accent/5">
               <div className="flex items-start gap-3">
@@ -642,7 +481,9 @@ export default function PaymentPage({
                   </div>
                   {currentStep === "create" && createStatus !== "idle" && (
                     <p className="mt-2 ml-8 text-xs text-secondary-foreground">
-                      {getTransactionStatusMessage(createStatus)}
+                      {getTransactionStatusMessage(
+                        createStatus as TransactionStatus,
+                      )}
                     </p>
                   )}
                   {createHash && currentStep === "create" && (
@@ -681,7 +522,9 @@ export default function PaymentPage({
                   </div>
                   {currentStep === "approve" && approvalStatus !== "idle" && (
                     <p className="mt-2 ml-8 text-xs text-secondary-foreground">
-                      {getTransactionStatusMessage(approvalStatus)}
+                      {getTransactionStatusMessage(
+                        approvalStatus as TransactionStatus,
+                      )}
                     </p>
                   )}
                   {approvalHash && currentStep === "approve" && (
@@ -720,7 +563,9 @@ export default function PaymentPage({
                   </div>
                   {currentStep === "deposit" && depositStatus !== "idle" && (
                     <p className="mt-2 ml-8 text-xs text-secondary-foreground">
-                      {getTransactionStatusMessage(depositStatus)}
+                      {getTransactionStatusMessage(
+                        depositStatus as TransactionStatus,
+                      )}
                     </p>
                   )}
                   {depositHash && (
