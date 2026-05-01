@@ -17,7 +17,6 @@ import {
 import { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,26 +24,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGetUser, useUpdateUser } from "@/lib/api/hooks/use-user";
+import { SettingsFormValues, settingsSchema } from "@/lib/types";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import { truncateAddress } from "@/lib/web3/utils";
 import { useWallet } from "@/lib/web3/wallet-context";
-
-const settingsSchema = z.object({
-  role: z.enum(["WORKER", "CLIENT"]),
-  displayName: z
-    .string()
-    .max(50, "Display name must be less than 50 characters")
-    .optional(),
-  bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
-  notifications: z.object({
-    emailDeposits: z.boolean(),
-    emailPayouts: z.boolean(),
-    emailMilestones: z.boolean(),
-    browserNotifications: z.boolean(),
-  }),
-});
-
-type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 export default function SettingsPage() {
   const {

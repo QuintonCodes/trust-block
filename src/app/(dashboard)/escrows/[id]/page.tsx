@@ -59,8 +59,7 @@ export default function EscrowDetailPage({
     refetch: refetchEscrow,
   } = useGetEscrow(id);
 
-  const { mutateAsync: saveSubmissionToDb, isPending: isSavingDb } =
-    useSubmitWorkMutation();
+  const { mutateAsync: saveSubmissionToDb } = useSubmitWorkMutation();
 
   const { mutateAsync: approveMilestoneDb } = useApproveMilestoneDb();
 
@@ -92,6 +91,7 @@ export default function EscrowDetailPage({
     null,
   );
   const [dueDateCountdown, setDueDateCountdown] = useState("");
+  const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
 
   // Derive action status from hook states
   const actionStatus = useMemo((): TransactionStatus => {
@@ -139,7 +139,7 @@ export default function EscrowDetailPage({
       }
 
       toast.success("Transaction confirmed!");
-      refetchEscrow();
+      await refetchEscrow();
       setTimeout(() => setSelectedMilestone(null), 1000);
     };
 
@@ -336,6 +336,7 @@ export default function EscrowDetailPage({
       return;
 
     setSelectedMilestone(submitModalState.index);
+    setIsProcessingSubmission(true);
 
     try {
       await saveSubmissionToDb({
@@ -345,13 +346,17 @@ export default function EscrowDetailPage({
         submissionUrl: submissionData,
       });
 
+      await refetchEscrow();
+
       toast.success("Work submitted for review!");
       setSubmitModalState({ isOpen: false, milestone: null, index: -1 });
-      refetchEscrow();
+      setSelectedMilestone(null);
     } catch (error) {
       console.error("Failed to submit work:", error);
       toast.error("Failed to save submission data. Please try again.");
       setSelectedMilestone(null);
+    } finally {
+      setIsProcessingSubmission(false);
     }
   }
 
@@ -501,9 +506,10 @@ export default function EscrowDetailPage({
 
                     const isLoading =
                       selectedMilestone === index &&
-                      actionStatus !== "idle" &&
-                      actionStatus !== "error" &&
-                      actionStatus !== "confirmed";
+                      (isProcessingSubmission ||
+                        (actionStatus !== "idle" &&
+                          actionStatus !== "error" &&
+                          actionStatus !== "confirmed"));
 
                     return (
                       <div
@@ -896,7 +902,7 @@ export default function EscrowDetailPage({
           milestone={submitModalState.milestone}
           escrowId={escrow.id}
           onSubmit={handleSubmitWork}
-          isSubmitting={isSavingDb}
+          isSubmitting={isProcessingSubmission}
         />
       )}
     </div>

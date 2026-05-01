@@ -21,7 +21,6 @@ import {
   useWatch,
 } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,84 +28,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateEscrowDb } from "@/lib/api/hooks/use-escrows-mutations";
+import { CreateEscrowFormValues, createEscrowSchema } from "@/lib/types";
 import { CHAIN_CONFIG, PRIMARY_CHAIN_ID } from "@/lib/web3/config";
 import { formatUSDC } from "@/lib/web3/utils";
 import { useWallet } from "@/lib/web3/wallet-context";
-
-const milestoneSchema = z.object({
-  title: z.string().optional(),
-  description: z.string().optional(),
-  amount: z.number({ error: "Must be a number" }).or(z.nan()).optional(),
-});
-
-const formSchema = z
-  .object({
-    projectTitle: z.string().min(1, "Project Title is required"),
-    scopeOfWork: z.string().min(1, "Scope of work is required"),
-    dueDate: z
-      .string()
-      .optional()
-      .refine(
-        (val) => {
-          if (!val) return true; // Optional field
-          const inputDate = new Date(val);
-          const today = new Date(new Date().toISOString().split("T")[0]);
-          return inputDate >= today;
-        },
-        { message: "Due date cannot be in the past" },
-      ),
-    useMilestones: z.boolean(),
-    fundImmediately: z.boolean(),
-    totalAmount: z.number({ error: "Must be a number" }).or(z.nan()).optional(),
-    milestones: z.array(milestoneSchema).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.useMilestones) {
-      if (!data.milestones || data.milestones.length === 0) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Add at least one milestone",
-          path: ["milestones"],
-        });
-        return;
-      }
-
-      data.milestones.forEach((m, index) => {
-        if (!m.title || m.title.trim() === "") {
-          ctx.addIssue({
-            code: "custom",
-            message: "Milestone title is required",
-            path: ["milestones", index, "title"],
-          });
-        }
-        if (
-          typeof m.amount !== "number" ||
-          isNaN(m.amount) ||
-          m.amount < 0.01
-        ) {
-          ctx.addIssue({
-            code: "custom",
-            message: "Amount must be at least 0.01",
-            path: ["milestones", index, "amount"],
-          });
-        }
-      });
-    } else {
-      if (
-        typeof data.totalAmount !== "number" ||
-        isNaN(data.totalAmount) ||
-        data.totalAmount <= 0
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Total amount must be greater than 0",
-          path: ["totalAmount"],
-        });
-      }
-    }
-  });
-
-type FormSchema = z.infer<typeof formSchema>;
 
 export default function NewEscrowPage() {
   const {
@@ -132,8 +57,8 @@ export default function NewEscrowPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormSchema>({
-    resolver: zodResolver(formSchema),
+  } = useForm<CreateEscrowFormValues>({
+    resolver: zodResolver(createEscrowSchema),
     mode: "onChange",
     defaultValues: {
       projectTitle: "",
@@ -184,7 +109,7 @@ export default function NewEscrowPage() {
     ? `${window.location.origin}/pay/${createdEscrowId}`
     : null;
 
-  const onSubmit: SubmitHandler<FormSchema> = async (data) => {
+  const onSubmit: SubmitHandler<CreateEscrowFormValues> = async (data) => {
     if (!isConnected || !address) {
       toast.error("Please connect your wallet first");
       return;

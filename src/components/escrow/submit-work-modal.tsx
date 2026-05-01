@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,36 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useFileUpload } from "@/lib/api/hooks/use-file-upload";
-import { Milestone } from "@/lib/types";
-
-const submitWorkSchema = z
-  .object({
-    submissionType: z.enum(["link", "file"]).nullable(),
-    deploymentUrl: z.string().optional(),
-    fileUrl: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.submissionType === "link") {
-      try {
-        new URL(data.deploymentUrl || "");
-      } catch {
-        ctx.addIssue({
-          code: "custom",
-          message: "Please enter a valid URL",
-          path: ["deploymentUrl"],
-        });
-      }
-    }
-    if (data.submissionType === "file" && !data.fileUrl) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Please upload a file before submitting",
-        path: ["fileUrl"],
-      });
-    }
-  });
-
-type SubmitWorkValues = z.infer<typeof submitWorkSchema>;
+import { Milestone, submitWorkSchema, SubmitWorkValues } from "@/lib/types";
 
 type SubmitWorkModalProps = {
   isOpen: boolean;
@@ -85,7 +55,7 @@ export function SubmitWorkModal({
     reset: resetForm,
     setError,
     clearErrors,
-    formState: { errors },
+    formState: { errors, isSubmitting: isFormSubmitting, isSubmitSuccessful },
   } = useForm<SubmitWorkValues>({
     resolver: zodResolver(submitWorkSchema),
     defaultValues: { submissionType: null, deploymentUrl: "", fileUrl: "" },
@@ -151,14 +121,13 @@ export function SubmitWorkModal({
     }
   }
 
-  async function onSubmitForm(data: SubmitWorkValues) {
+  const onSubmitForm = async (data: SubmitWorkValues) => {
     if (data.submissionType === "link" && data.deploymentUrl) {
       await onSubmit("link", data.deploymentUrl);
     } else if (data.submissionType === "file" && data.fileUrl) {
       await onSubmit("file", data.fileUrl);
     }
-    handleClose();
-  }
+  };
 
   function handleClose() {
     resetForm();
@@ -167,8 +136,11 @@ export function SubmitWorkModal({
     onClose();
   }
 
+  const isCurrentlySubmitting =
+    isSubmitting || isFormSubmitting || isSubmitSuccessful;
+
   const isSubmitDisabled =
-    isSubmitting ||
+    isCurrentlySubmitting ||
     isUploading ||
     (submissionType === "link" && !deploymentUrl) ||
     (submissionType === "file" && !fileUrl);

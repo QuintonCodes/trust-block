@@ -1,3 +1,127 @@
+import { z } from "zod";
+
+// Schemas
+export const milestoneSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  amount: z.number({ error: "Must be a number" }).or(z.nan()).optional(),
+});
+
+export const createEscrowSchema = z
+  .object({
+    projectTitle: z.string().min(1, "Project Title is required"),
+    scopeOfWork: z.string().min(1, "Scope of work is required"),
+    dueDate: z
+      .string()
+      .optional()
+      .refine(
+        (val) => {
+          if (!val) return true; // Optional field
+          const inputDate = new Date(val);
+          const today = new Date(new Date().toISOString().split("T")[0]);
+          return inputDate >= today;
+        },
+        { message: "Due date cannot be in the past" },
+      ),
+    useMilestones: z.boolean(),
+    fundImmediately: z.boolean(),
+    totalAmount: z.number({ error: "Must be a number" }).or(z.nan()).optional(),
+    milestones: z.array(milestoneSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.useMilestones) {
+      if (!data.milestones || data.milestones.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one milestone",
+          path: ["milestones"],
+        });
+        return;
+      }
+
+      data.milestones.forEach((m, index) => {
+        if (!m.title || m.title.trim() === "") {
+          ctx.addIssue({
+            code: "custom",
+            message: "Milestone title is required",
+            path: ["milestones", index, "title"],
+          });
+        }
+        if (
+          typeof m.amount !== "number" ||
+          isNaN(m.amount) ||
+          m.amount < 0.01
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Amount must be at least 0.01",
+            path: ["milestones", index, "amount"],
+          });
+        }
+      });
+    } else {
+      if (
+        typeof data.totalAmount !== "number" ||
+        isNaN(data.totalAmount) ||
+        data.totalAmount <= 0
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Total amount must be greater than 0",
+          path: ["totalAmount"],
+        });
+      }
+    }
+  });
+
+export type CreateEscrowFormValues = z.infer<typeof createEscrowSchema>;
+
+export const settingsSchema = z.object({
+  role: z.enum(["WORKER", "CLIENT"]),
+  displayName: z
+    .string()
+    .max(50, "Display name must be less than 50 characters")
+    .optional(),
+  bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
+  notifications: z.object({
+    emailDeposits: z.boolean(),
+    emailPayouts: z.boolean(),
+    emailMilestones: z.boolean(),
+    browserNotifications: z.boolean(),
+  }),
+});
+
+export type SettingsFormValues = z.infer<typeof settingsSchema>;
+
+export const submitWorkSchema = z
+  .object({
+    submissionType: z.enum(["link", "file"]).nullable(),
+    deploymentUrl: z.string().optional(),
+    fileUrl: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.submissionType === "link") {
+      try {
+        new URL(data.deploymentUrl || "");
+      } catch {
+        ctx.addIssue({
+          code: "custom",
+          message: "Please enter a valid URL",
+          path: ["deploymentUrl"],
+        });
+      }
+    }
+    if (data.submissionType === "file" && !data.fileUrl) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Please upload a file before submitting",
+        path: ["fileUrl"],
+      });
+    }
+  });
+
+export type SubmitWorkValues = z.infer<typeof submitWorkSchema>;
+
 export type UserRole = "WORKER" | "CLIENT";
 
 export type EscrowStatus =
