@@ -194,7 +194,7 @@ export default function PaymentPage({
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 mt-6">
+            <div className="flex flex-col items-center gap-3 mt-6">
               <Link href={`/escrows/${escrow.id}`}>
                 <Button className="w-full bg-primary/80 hover:bg-primary text-white">
                   View Escrow Dashboard

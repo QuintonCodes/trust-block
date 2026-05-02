@@ -14,6 +14,7 @@ import {
   LinkIcon,
   Loader2,
   Timer,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
@@ -49,7 +50,7 @@ export default function EscrowDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { address, isMounted } = useWallet();
+  const { address, isConnected, isMounted } = useWallet();
 
   // Fetch Escrow Data
   const {
@@ -196,6 +197,22 @@ export default function EscrowDetailPage({
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
+        <div className="p-4 bg-secondary rounded-full">
+          <Wallet className="size-8 text-secondary-foreground" />
+        </div>
+        <h2 className="text-2xl font-semibold text-white">
+          Connect Your Wallet
+        </h2>
+        <p className="text-secondary-foreground max-w-md">
+          Please connect your wallet to view and manage your active escrows.
+        </p>
       </div>
     );
   }
@@ -506,10 +523,7 @@ export default function EscrowDetailPage({
 
                     const isLoading =
                       selectedMilestone === index &&
-                      (isProcessingSubmission ||
-                        (actionStatus !== "idle" &&
-                          actionStatus !== "error" &&
-                          actionStatus !== "confirmed"));
+                      (isProcessingSubmission || actionStatus !== "error");
 
                     return (
                       <div
@@ -634,9 +648,10 @@ export default function EscrowDetailPage({
                                     {isLoading ? (
                                       <>
                                         <Loader2 className="mr-2 size-3.5 animate-spin" />
-                                        {actionStatus === "awaiting-signature"
-                                          ? "Confirm in wallet..."
-                                          : "Confirming..."}
+                                        {actionStatus === "confirming" ||
+                                        actionStatus === "confirmed"
+                                          ? "Confirming...."
+                                          : "Confirm in wallet..."}
                                       </>
                                     ) : (
                                       <>
